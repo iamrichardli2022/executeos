@@ -1,0 +1,5 @@
+{
+  "name": "ExecuteOS",
+  "description": "A calm, desktop-first tool to transform brain dumps into scheduled Google Calendar events.",
+  "requestFramePermissions": []
+}
