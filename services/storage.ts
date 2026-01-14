@@ -1,10 +1,12 @@
-import { CalendarBlock, CaptureItem, Commitment, StrategicPriority } from "../types";
+
+import { CalendarBlock, CaptureItem, Commitment, StrategicPriority, ExecutionSession } from "../types";
 
 const KEYS = {
   PRIORITIES: "ps_priorities",
   CAPTURE_ITEMS: "ps_capture_items",
   COMMITMENTS: "ps_commitments",
   CALENDAR_BLOCKS: "ps_calendar_blocks",
+  SESSIONS: "ps_sessions",
 };
 
 export const StorageService = {
@@ -42,6 +44,27 @@ export const StorageService = {
 
   saveCalendarBlocks: (items: CalendarBlock[]) => {
     localStorage.setItem(KEYS.CALENDAR_BLOCKS, JSON.stringify(items));
+  },
+
+  getSessions: (): ExecutionSession[] => {
+    const stored = localStorage.getItem(KEYS.SESSIONS);
+    return stored ? JSON.parse(stored) : [];
+  },
+
+  saveSession: (session: ExecutionSession) => {
+    const sessions = StorageService.getSessions();
+    localStorage.setItem(KEYS.SESSIONS, JSON.stringify([session, ...sessions]));
+    
+    // Clear current working buffers after saving to a permanent session
+    StorageService.saveCaptureItems([]);
+    StorageService.saveCommitments([]);
+    StorageService.saveCalendarBlocks([]);
+  },
+
+  clearCurrentBuffers: () => {
+    StorageService.saveCaptureItems([]);
+    StorageService.saveCommitments([]);
+    StorageService.saveCalendarBlocks([]);
   },
 
   clearAll: () => {

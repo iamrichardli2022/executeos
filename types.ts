@@ -51,6 +51,15 @@ export interface CalendarBlock {
   lastSyncedAtISO: string;
 }
 
+export interface ExecutionSession {
+  id: string;
+  timestampISO: string;
+  items: CaptureItem[];
+  commitments: Commitment[];
+  blocks: CalendarBlock[];
+  alignmentScore: number;
+}
+
 export interface SchedulingOption {
   startISO: string;
   endISO: string;

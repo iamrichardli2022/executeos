@@ -10,79 +10,64 @@ interface Props {
   onFinish: () => void;
 }
 
-type ViewType = "day" | "week";
+type ViewType = "day" | "week" | "month";
 
 export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish }) => {
   const [loading, setLoading] = useState(false);
-  const [calendars, setCalendars] = useState<any[]>([]);
-  const [selectedCalendarId, setSelectedCalendarId] = useState<string>("primary");
   const [signedIn, setSignedIn] = useState(false);
-  const [localMode, setLocalMode] = useState(false);
-  const [viewType, setViewType] = useState<ViewType>("day");
+  const [localMode, setLocalMode] = useState(true);
+  const [viewType, setViewType] = useState<ViewType>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [gridInterval, setGridInterval] = useState(30);
 
   // Dragging state
   const [draggingCommitment, setDraggingCommitment] = useState<Commitment | null>(null);
   const [draggingBlockId, setDraggingBlockId] = useState<string | null>(null);
-  const [dragOverInfo, setDragOverInfo] = useState<{ day: string, hour: number, minute: number } | null>(null);
+  const [dragOverInfo, setDragOverInfo] = useState<{ date: Date, hour: number, minute: number } | null>(null);
 
-  // Track blocks
+  // Constants for precision
+  const HOUR_HEIGHT = 120; 
+
+  // State for blocks
   const [blocks, setBlocks] = useState<CalendarBlock[]>([]);
   
-  const HOUR_HEIGHT = 80; // Pixels per hour
-
   useEffect(() => {
     const storedBlocks = JSON.parse(localStorage.getItem("ps_calendar_blocks") || "[]");
     setBlocks(storedBlocks);
+    GoogleService.init().catch(e => console.error("Google Init Failed", e));
   }, []);
 
   const scheduledIds = useMemo(() => new Set(blocks.map(b => b.commitmentId)), [blocks]);
   const unscheduled = commitments.filter(c => !scheduledIds.has(c.id));
 
-  useEffect(() => {
-    GoogleService.init().catch(err => {
-        console.error("PlanScreen: Google Service init error suppressed for UX", err);
-    });
-  }, []);
-
   const handleSignIn = async () => {
     try {
+      setLoading(true);
       await GoogleService.signIn();
       setSignedIn(true);
-      const cals = await GoogleService.listCalendars();
-      setCalendars(cals);
       setLocalMode(false);
     } catch (e) {
       console.error("Sign in failed", e);
+      alert("Google Calendar connection failed. You can continue in Local Mode.");
+      setLocalMode(true);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleStartOffline = () => {
-    setLocalMode(true);
-    setSignedIn(false);
-  };
-
   const scheduleEvent = async (commitment: Commitment, start: Date) => {
-    const duration = commitment.durationMinutes || gridInterval;
+    const duration = commitment.durationMinutes || 60;
     const end = new Date(start.getTime() + duration * 60000);
     
     setLoading(true);
     try {
         let googleEventId = "";
-        
         if (signedIn && !localMode) {
-            const event = await GoogleService.createEvent(selectedCalendarId, {
+            const event = await GoogleService.createEvent("primary", {
                 summary: commitment.title,
-                description: `${commitment.description || ""}\n\nManaged by ExecuteOS`,
+                description: `Managed by ExecuteOS`,
                 start: { dateTime: start.toISOString() },
-                end: { dateTime: end.toISOString() },
-                extendedProperties: {
-                    private: {
-                        commitment_id: commitment.id,
-                        version: "1"
-                    }
-                }
+                end: { dateTime: end.toISOString() }
             });
             googleEventId = event.id;
         }
@@ -91,7 +76,7 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
             id: uuidv4(),
             commitmentId: commitment.id,
             googleEventId: googleEventId,
-            calendarId: localMode ? "local" : selectedCalendarId,
+            calendarId: localMode ? "local" : "primary",
             startISO: start.toISOString(),
             endISO: end.toISOString(),
             status: "planned",
@@ -103,7 +88,7 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
         localStorage.setItem("ps_calendar_blocks", JSON.stringify(updatedBlocks));
     } catch (e) {
         console.error(e);
-        alert("Failed to schedule.");
+        alert("Scheduling failed.");
     } finally {
         setLoading(false);
         setDraggingCommitment(null);
@@ -111,22 +96,19 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
     }
   };
 
-  const moveBlock = async (blockId: string, start: Date) => {
+  const moveBlock = async (blockId: string, newStart: Date) => {
     const blockIndex = blocks.findIndex(b => b.id === blockId);
     if (blockIndex === -1) return;
 
     const block = blocks[blockIndex];
-    const originalStart = new Date(block.startISO);
-    const originalEnd = new Date(block.endISO);
-    const durationMs = originalEnd.getTime() - originalStart.getTime();
-    
-    const newEnd = new Date(start.getTime() + durationMs);
+    const durationMs = new Date(block.endISO).getTime() - new Date(block.startISO).getTime();
+    const newEnd = new Date(newStart.getTime() + durationMs);
 
     setLoading(true);
     try {
         const updatedBlock = {
             ...block,
-            startISO: start.toISOString(),
+            startISO: newStart.toISOString(),
             endISO: newEnd.toISOString(),
             lastSyncedAtISO: new Date().toISOString()
         };
@@ -135,9 +117,6 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
         updatedBlocks[blockIndex] = updatedBlock;
         setBlocks(updatedBlocks);
         localStorage.setItem("ps_calendar_blocks", JSON.stringify(updatedBlocks));
-    } catch (e) {
-        console.error(e);
-        alert("Failed to move event.");
     } finally {
         setLoading(false);
         setDraggingBlockId(null);
@@ -145,7 +124,13 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
     }
   };
 
-  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const deleteBlock = (blockId: string) => {
+    if(!confirm("Remove from schedule?")) return;
+    const updated = blocks.filter(b => b.id !== blockId);
+    setBlocks(updated);
+    localStorage.setItem("ps_calendar_blocks", JSON.stringify(updated));
+  };
+
   const daysInWeek = useMemo(() => {
     const start = new Date(currentDate);
     start.setDate(start.getDate() - start.getDay());
@@ -156,31 +141,33 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
     });
   }, [currentDate]);
 
-  const displayedDays = viewType === "day" ? [currentDate] : daysInWeek;
-
-  const onDragOver = (e: React.DragEvent, dayIso: string, hour: number, minute: number) => {
-    e.preventDefault();
-    if (dragOverInfo?.day !== dayIso || dragOverInfo?.hour !== hour || dragOverInfo?.minute !== minute) {
-      setDragOverInfo({ day: dayIso, hour, minute });
+  const monthGrid = useMemo(() => {
+    const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    const startOffset = firstDay.getDay();
+    const grid = [];
+    for (let i = startOffset; i > 0; i--) {
+        const d = new Date(firstDay);
+        d.setDate(d.getDate() - i);
+        grid.push({ date: d, currentMonth: false });
     }
-  };
-
-  const onDrop = (e: React.DragEvent, date: Date, hour: number, minute: number) => {
-    e.preventDefault();
-    const start = new Date(date);
-    start.setHours(hour, minute, 0, 0);
-
-    if (draggingCommitment) {
-      scheduleEvent(draggingCommitment, start);
-    } else if (draggingBlockId) {
-      moveBlock(draggingBlockId, start);
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+        grid.push({ date: new Date(currentDate.getFullYear(), currentDate.getMonth(), i), currentMonth: true });
     }
-    setDragOverInfo(null);
-  };
+    const remaining = 42 - grid.length;
+    for (let i = 1; i <= remaining; i++) {
+        const d = new Date(lastDay);
+        d.setDate(d.getDate() + i);
+        grid.push({ date: d, currentMonth: false });
+    }
+    return grid;
+  }, [currentDate]);
 
   const changeDate = (offset: number) => {
     const next = new Date(currentDate);
-    next.setDate(next.getDate() + offset);
+    if (viewType === "day") next.setDate(next.getDate() + offset);
+    if (viewType === "week") next.setDate(next.getDate() + (offset * 7));
+    if (viewType === "month") next.setMonth(next.getMonth() + offset);
     setCurrentDate(next);
   };
 
@@ -190,23 +177,42 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
     return `${displayH}:${m.toString().padStart(2, '0')} ${period}`;
   };
 
-  const getSubSlots = (interval: number) => {
-    const count = 60 / interval;
-    return Array.from({ length: count }, (_, i) => i * interval);
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const slotsPerHour = 60 / gridInterval;
+
+  const onSlotDragOver = (e: React.DragEvent, date: Date, hour: number, minute: number) => {
+      e.preventDefault();
+      const infoDate = new Date(date);
+      infoDate.setHours(hour, minute, 0, 0);
+      if (!dragOverInfo || dragOverInfo.date.getTime() !== infoDate.getTime()) {
+          setDragOverInfo({ date: infoDate, hour, minute });
+      }
+  };
+
+  const onSlotDrop = (e: React.DragEvent, date: Date, hour: number, minute: number) => {
+      e.preventDefault();
+      const start = new Date(date);
+      start.setHours(hour, minute, 0, 0);
+
+      if (draggingCommitment) {
+          scheduleEvent(draggingCommitment, start);
+      } else if (draggingBlockId) {
+          moveBlock(draggingBlockId, start);
+      }
+      setDragOverInfo(null);
   };
 
   return (
-    <div className="flex h-full relative overflow-hidden bg-slate-50">
-      {/* Sidebar List */}
-      <div className="w-80 border-r border-slate-100 bg-white flex flex-col overflow-hidden shrink-0 z-30">
-        <div className="p-6 border-b border-slate-50">
-            <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">Inventory</h2>
-            <h3 className="text-xl font-light text-slate-800">Unscheduled ({unscheduled.length})</h3>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+    <div className="flex h-full bg-white overflow-hidden relative">
+      <aside className="w-80 border-r border-slate-100 flex flex-col z-50 bg-white shadow-2xl shadow-slate-200">
+        <header className="p-6 border-b border-slate-50 shrink-0">
+          <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Inventory</h2>
+          <div className="text-2xl font-light text-slate-800">{unscheduled.length} Remaining</div>
+        </header>
+
+        <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-3">
           {unscheduled.map(c => {
-            const priority = priorities.find(p => p.id === c.priorityId);
+            const p = priorities.find(pri => pri.id === c.priorityId);
             return (
               <div 
                 key={c.id}
@@ -215,217 +221,266 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
                   setDraggingCommitment(c);
                   setDraggingBlockId(null);
                 }}
-                onDragEnd={() => {
-                  setDraggingCommitment(null);
-                  setDragOverInfo(null);
-                }}
-                className="p-4 rounded-2xl border border-slate-50 bg-slate-50/30 hover:bg-white hover:border-indigo-100 hover:shadow-lg hover:shadow-indigo-50/50 transition-all cursor-grab active:cursor-grabbing group"
+                className="bg-slate-50 border border-slate-100 p-4 rounded-2xl cursor-grab active:cursor-grabbing hover:bg-white hover:border-indigo-100 hover:shadow-lg transition-all group"
               >
-                <div className="flex flex-col gap-2">
-                    <div className="flex justify-between items-start gap-3">
-                        <h3 className="font-bold text-slate-700 text-xs leading-tight group-hover:text-indigo-600 transition-colors">{c.title}</h3>
-                        <span className="text-[9px] bg-white border border-slate-100 px-2 py-0.5 rounded-full font-bold text-slate-400 shrink-0">{c.durationMinutes || gridInterval}m</span>
-                    </div>
-                    {priority && (
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                        <span className="text-[10px] font-bold text-indigo-500/80 uppercase tracking-wider">{priority.name}</span>
-                      </div>
-                    )}
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <h4 className="text-xs font-bold text-slate-700 leading-tight group-hover:text-indigo-600">{c.title}</h4>
+                  <span className="text-[9px] font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-lg shrink-0">{c.durationMinutes}m</span>
                 </div>
+                {p && (
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{p.name}</span>
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
 
-        <div className="p-6 bg-slate-50 border-t border-slate-100">
-             <h4 className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-3">Grid Resolution</h4>
-             <div className="flex gap-2">
-                {[15, 30, 60].map(d => (
-                    <button 
-                        key={d}
-                        onClick={() => setGridInterval(d)}
-                        className={`flex-1 py-2 rounded-xl text-[10px] font-bold transition-all border ${gridInterval === d ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-200'}`}
-                    >
-                        {d}m
-                    </button>
-                ))}
-             </div>
+        <div className="p-6 border-t border-slate-50 bg-slate-50/30 space-y-6 shrink-0">
+            {!signedIn ? (
+              <button 
+                onClick={handleSignIn}
+                className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 py-4 rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-200 transition-all group"
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.49h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.91C16.65 13.98 18 11.5 18 8.6c0-.21-.02-.42-.05-.63z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.91-2.26c-.8.54-1.83.86-3.05.86-2.34 0-4.32-1.58-5.03-3.7H.95v2.3C2.43 15.89 5.5 18 9 18z"/><path fill="#FBBC05" d="M3.97 10.71c-.18-.54-.28-1.12-.28-1.71s.1-1.17.28-1.71V4.99H.95A8.996 8.996 0 0 0 0 9c0 1.45.35 2.82.95 4.01l3.02-2.3z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.89 11.43 0 9 0 5.5 0 2.43 2.11.95 4.99l3.02 2.3c.71-2.12 2.69-3.7 5.03-3.7z"/></svg>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 group-hover:text-indigo-600">Connect Calendar</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-2xl border border-emerald-100">
+                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Google Synced</span>
+              </div>
+            )}
+            
+            <div>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">Grid Precision</h3>
+              <div className="grid grid-cols-3 gap-2">
+                  {[15, 30, 60].map(int => (
+                      <button 
+                          key={int}
+                          onClick={() => setGridInterval(int)}
+                          className={`py-2 rounded-xl text-[10px] font-black uppercase transition-all ${gridInterval === int ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-white border border-slate-200 text-slate-400 hover:border-indigo-200'}`}
+                      >
+                          {int}m
+                      </button>
+                  ))}
+              </div>
+            </div>
         </div>
-      </div>
+      </aside>
 
-      {/* Main Calendar View */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Calendar Header */}
-        <header className="bg-white border-b border-slate-100 px-8 py-4 flex items-center justify-between shrink-0 z-40">
-            <div className="flex items-center gap-6">
-                <div className="flex items-center gap-1">
-                    <button onClick={() => changeDate(-1)} className="p-2 hover:bg-slate-50 rounded-full text-slate-400 transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                    </button>
-                    <button onClick={() => setCurrentDate(new Date())} className="px-4 py-2 hover:bg-slate-50 rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-500 transition-colors">Today</button>
-                    <button onClick={() => changeDate(1)} className="p-2 hover:bg-slate-50 rounded-full text-slate-400 transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                    </button>
-                </div>
-                <h2 className="text-xl font-light text-slate-800 tracking-tight">
-                    {currentDate.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}
-                </h2>
+      <main className="flex-1 flex flex-col overflow-hidden relative bg-slate-50">
+        <nav className="h-16 border-b border-slate-100 px-8 flex items-center justify-between shrink-0 bg-white z-[50]">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center bg-slate-100 p-1 rounded-2xl">
+                {["day", "week", "month"].map(t => (
+                  <button 
+                    key={t}
+                    onClick={() => setViewType(t as ViewType)} 
+                    className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewType === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    {t}
+                  </button>
+                ))}
             </div>
-
+            
             <div className="flex items-center gap-3">
-                <div className="bg-slate-100 p-1 rounded-xl flex">
-                    <button onClick={() => setViewType("day")} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${viewType === "day" ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Day</button>
-                    <button onClick={() => setViewType("week")} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${viewType === "week" ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Week</button>
-                </div>
-                <div className="w-px h-6 bg-slate-100 mx-2"></div>
-                {!signedIn && !localMode ? (
-                    <button onClick={handleSignIn} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100">Connect Calendar</button>
-                ) : (
-                    <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                        <div className={`w-2 h-2 rounded-full ${localMode ? 'bg-amber-400' : 'bg-emerald-400'}`}></div>
-                        {localMode ? 'Local Mode' : 'Live Sync'}
-                    </div>
-                )}
+                <button onClick={() => changeDate(-1)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+                <h3 className="text-sm font-bold text-slate-800 tracking-tight min-w-[120px] text-center uppercase tracking-widest">
+                    {viewType === "month" 
+                        ? currentDate.toLocaleDateString([], { month: 'long', year: 'numeric' })
+                        : currentDate.toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                </h3>
+                <button onClick={() => changeDate(1)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
             </div>
-        </header>
+          </div>
 
-        {/* Scrollable Grid */}
-        <div className="flex-1 overflow-y-auto relative no-scrollbar bg-white">
-            <div className="flex min-h-full min-w-full">
-                {/* Time Axis */}
-                <div className="w-16 flex flex-col border-r border-slate-50 sticky left-0 bg-white z-20 shrink-0">
+          <button onClick={onFinish} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold text-xs hover:bg-black transition-all">
+            Review Plan
+          </button>
+        </nav>
+
+        {viewType !== "month" ? (
+          <div className="flex-1 overflow-auto relative flex flex-col bg-slate-50 no-scrollbar">
+            
+            {/* STICKY DAY HEADERS ROW */}
+            <div className="flex sticky top-0 z-[45] bg-white border-b border-slate-100 shrink-0">
+                <div className="w-20 bg-white border-r border-slate-100 shrink-0"></div>
+                <div className="flex-1 flex min-w-[1200px]">
+                    {(viewType === "day" ? [currentDate] : daysInWeek).map(day => (
+                        <div key={day.toISOString()} className="flex-1 h-16 flex flex-col items-center justify-center border-r border-slate-100 bg-white/95 backdrop-blur-md">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{day.toLocaleDateString([], { weekday: 'short' })}</span>
+                            <span className={`text-sm font-bold mt-1 tabular-nums ${new Date().toDateString() === day.toDateString() ? 'text-indigo-600 bg-indigo-50 px-2 rounded-lg' : 'text-slate-800'}`}>{day.getDate()}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* MAIN GRID BODY */}
+            <div className="flex relative min-h-fit">
+                {/* STICKY TIME LABELS COLUMN */}
+                <div className="w-20 sticky left-0 z-40 bg-white border-r border-slate-100 shrink-0">
                     {hours.map(h => (
-                        <div key={h} className="h-20 border-b border-slate-50 relative">
-                            <span className="absolute -top-2 left-0 w-full text-center text-[9px] font-bold text-slate-300">
+                        <div key={h} className="relative" style={{ height: `${HOUR_HEIGHT}px` }}>
+                            <span className="absolute -top-2.5 right-3 text-[10px] font-black text-slate-300 uppercase tabular-nums bg-white px-1">
                                 {h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`}
                             </span>
                         </div>
                     ))}
                 </div>
 
-                {/* Day Columns */}
-                <div className="flex-1 flex min-w-[600px]">
-                    {displayedDays.map(day => (
-                        <div key={day.toISOString()} className="flex-1 border-r border-slate-50 relative group">
-                            {/* Day Header */}
-                            <div className="sticky top-0 bg-white/95 backdrop-blur-md z-10 border-b border-slate-50 p-3 text-center transition-all group-hover:bg-indigo-50/20">
-                                <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                    {day.toLocaleDateString([], { weekday: 'short' })}
-                                </span>
-                                <span className={`inline-block w-8 h-8 leading-8 rounded-full text-sm font-bold mt-1 ${new Date().toDateString() === day.toDateString() ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-800'}`}>
-                                    {day.getDate()}
-                                </span>
-                            </div>
-
-                            {/* Hour Slots Container */}
-                            <div className="relative">
+                {/* DAY GRID COLUMNS */}
+                <div className="flex-1 flex min-w-[1200px] relative">
+                    {(viewType === "day" ? [currentDate] : daysInWeek).map(day => (
+                        <div key={day.toISOString()} className="flex-1 border-r border-slate-100 relative group">
+                            
+                            {/* GRID LINES & DROP ZONES */}
+                            <div className="relative" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
                                 {hours.map(h => (
-                                    <div key={h} className="h-20 border-b border-slate-50 flex flex-col">
-                                        {getSubSlots(gridInterval).map(min => (
-                                          <div 
-                                              key={min}
-                                              className={`flex-1 transition-all border-b last:border-b-0 border-slate-50/30 relative z-0 ${
-                                                dragOverInfo?.day === day.toISOString() && 
-                                                dragOverInfo?.hour === h && 
-                                                dragOverInfo?.minute === min 
-                                                  ? 'bg-indigo-500/10' 
-                                                  : 'hover:bg-slate-50/80'
-                                              }`}
-                                              onDragOver={(e) => onDragOver(e, day.toISOString(), h, min)}
-                                              onDrop={(e) => onDrop(e, day, h, min)}
-                                          />
-                                        ))}
-                                    </div>
+                                    <React.Fragment key={h}>
+                                        {/* Major hour line */}
+                                        <div className="absolute left-0 right-0 border-b border-slate-200 pointer-events-none" style={{ top: `${h * HOUR_HEIGHT}px`, height: '1px' }}></div>
+                                        
+                                        {/* Sub-hour Interval lines */}
+                                        {Array.from({ length: slotsPerHour }).map((_, i) => {
+                                            const min = i * gridInterval;
+                                            return (
+                                                <div 
+                                                    key={min}
+                                                    className={`absolute left-0 right-0 border-b border-slate-100/40 transition-all z-0 hover:bg-indigo-500/5`}
+                                                    style={{ 
+                                                        top: `${(h + min/60) * HOUR_HEIGHT}px`, 
+                                                        height: `${(gridInterval/60) * HOUR_HEIGHT}px`
+                                                    }}
+                                                    onDragOver={(e) => onSlotDragOver(e, day, h, min)}
+                                                    onDrop={(e) => onSlotDrop(e, day, h, min)}
+                                                />
+                                            );
+                                        })}
+                                    </React.Fragment>
                                 ))}
 
-                                {/* GHOST PLACEHOLDER */}
-                                {dragOverInfo?.day === day.toISOString() && (draggingCommitment || draggingBlockId) && (() => {
-                                    const dragSource = draggingCommitment || blocks.find(b => b.id === draggingBlockId);
-                                    if (!dragSource) return null;
-                                    
-                                    let duration = 0;
-                                    if ('durationMinutes' in dragSource) {
-                                      duration = dragSource.durationMinutes || gridInterval;
-                                    } else {
-                                      const start = new Date(dragSource.startISO).getTime();
-                                      const end = new Date(dragSource.endISO).getTime();
-                                      duration = (end - start) / 60000;
-                                    }
-
-                                    const top = (dragOverInfo.hour * HOUR_HEIGHT) + (dragOverInfo.minute / 60 * HOUR_HEIGHT);
-                                    const height = (duration / 60 * HOUR_HEIGHT);
-
+                                {/* DRAG PREVIEW */}
+                                {dragOverInfo && (draggingCommitment || draggingBlockId) && dragOverInfo.date.toDateString() === day.toDateString() && (() => {
+                                    const commitment = draggingCommitment || commitments.find(c => {
+                                        const b = blocks.find(blk => blk.id === draggingBlockId);
+                                        return b?.commitmentId === c.id;
+                                    });
+                                    const duration = commitment?.durationMinutes || 60;
+                                    const top = (dragOverInfo.hour + dragOverInfo.minute / 60) * HOUR_HEIGHT;
+                                    const height = (duration / 60) * HOUR_HEIGHT;
                                     return (
                                         <div 
                                             style={{ top: `${top}px`, height: `${height}px` }}
-                                            className="absolute left-1.5 right-1.5 border-2 border-dashed border-indigo-400 bg-indigo-50/40 rounded-xl z-20 pointer-events-none animate-pulse flex items-center justify-center"
+                                            className="absolute left-1 right-1 border-2 border-dashed border-indigo-400 bg-indigo-500/10 rounded-xl z-20 pointer-events-none animate-pulse flex flex-col items-center justify-center"
                                         >
-                                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-white px-2 py-1 rounded-md shadow-sm">
+                                            <div className="bg-indigo-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-lg">
                                                 {formatTime(dragOverInfo.hour, dragOverInfo.minute)}
-                                            </span>
+                                            </div>
                                         </div>
                                     );
                                 })()}
 
-                                {/* Events Rendering */}
-                                {blocks
-                                    .filter(b => new Date(b.startISO).toDateString() === day.toDateString())
-                                    .map(b => {
-                                        const comm = commitments.find(c => c.id === b.commitmentId);
-                                        const start = new Date(b.startISO);
-                                        const end = new Date(b.endISO);
-                                        const top = (start.getHours() * HOUR_HEIGHT) + (start.getMinutes() / 60 * HOUR_HEIGHT);
-                                        const height = ((end.getTime() - start.getTime()) / 60000 / 60 * HOUR_HEIGHT);
-                                        
-                                        const isDraggingThis = draggingBlockId === b.id;
-                                        
-                                        return (
-                                            <div 
-                                                key={b.id}
-                                                draggable
-                                                onDragStart={() => {
-                                                  setDraggingBlockId(b.id);
-                                                  setDraggingCommitment(null);
-                                                }}
-                                                onDragEnd={() => {
-                                                  setDraggingBlockId(null);
-                                                  setDragOverInfo(null);
-                                                }}
-                                                style={{ top: `${top}px`, height: `${height}px` }}
-                                                className={`absolute left-1.5 right-1.5 border border-indigo-100 rounded-xl shadow-sm overflow-hidden z-10 group/event p-2 transition-all cursor-move active:cursor-grabbing ${
-                                                  isDraggingThis ? 'opacity-20 grayscale' : 'bg-white hover:shadow-xl hover:border-indigo-300'
-                                                }`}
-                                            >
-                                                <div className={`w-1 absolute left-0 top-0 bottom-0 ${isDraggingThis ? 'bg-slate-300' : 'bg-indigo-500'}`}></div>
-                                                <div className="text-[10px] font-bold text-slate-800 truncate leading-tight">{comm?.title || "Untitled"}</div>
-                                                <div className="text-[8px] text-slate-400 mt-1 font-semibold uppercase tracking-wider">
-                                                    {formatTime(start.getHours(), start.getMinutes())}
+                                {/* SCHEDULED ITEMS */}
+                                {blocks.filter(b => new Date(b.startISO).toDateString() === day.toDateString()).map(block => {
+                                    const commitment = commitments.find(c => c.id === block.commitmentId);
+                                    const priority = priorities.find(p => p.id === commitment?.priorityId);
+                                    const start = new Date(block.startISO);
+                                    const end = new Date(block.endISO);
+                                    const durationMin = (end.getTime() - start.getTime()) / 60000;
+                                    const top = (start.getHours() + start.getMinutes() / 60) * HOUR_HEIGHT;
+                                    const height = (durationMin / 60) * HOUR_HEIGHT;
+                                    const isDragging = draggingBlockId === block.id;
+
+                                    return (
+                                        <div 
+                                            key={block.id}
+                                            draggable
+                                            onDragStart={() => {
+                                                setDraggingBlockId(block.id);
+                                                setDraggingCommitment(null);
+                                            }}
+                                            style={{ top: `${top}px`, height: `${height}px` }}
+                                            className={`absolute left-1 right-1 border-l-[6px] rounded-xl shadow-md p-3 overflow-visible z-10 cursor-move transition-all flex flex-col group/block bg-white hover:shadow-2xl hover:z-[60] ${isDragging ? 'opacity-20 grayscale border-slate-300' : 'border-indigo-600'}`}
+                                        >
+                                            <div className="flex justify-between items-start gap-1">
+                                                <h5 className="text-[11px] font-bold text-slate-800 leading-tight truncate">{commitment?.title || "Event"}</h5>
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); deleteBlock(block.id); }}
+                                                    className="opacity-0 group-hover/block:opacity-100 p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all shrink-0"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                                </button>
+                                            </div>
+                                            <div className="mt-auto flex flex-col gap-0.5 text-[9px] font-black text-slate-400 tabular-nums">
+                                                <div className="flex items-center gap-1.5 uppercase tracking-wider text-slate-300">
+                                                  {formatTime(start.getHours(), start.getMinutes())} – {formatTime(end.getHours(), end.getMinutes())}
+                                                </div>
+                                                <span className="text-indigo-400 font-bold">{durationMin}m</span>
+                                            </div>
+
+                                            {/* HOVER TOOLTIP */}
+                                            <div className="absolute left-full ml-4 top-0 w-64 bg-slate-900 text-white rounded-[1.5rem] p-5 shadow-2xl opacity-0 pointer-events-none group-hover/block:opacity-100 transition-all z-[100] translate-x-2 group-hover/block:translate-x-0">
+                                                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 mb-2">Details</div>
+                                                <h6 className="text-sm font-bold mb-3 leading-snug">{commitment?.title}</h6>
+                                                <div className="grid grid-cols-2 gap-4 border-t border-slate-800 pt-3">
+                                                    <div>
+                                                      <div className="text-[9px] font-black text-slate-500 uppercase mb-1">Duration</div>
+                                                      <div className="text-xs font-bold">{durationMin} Minutes</div>
+                                                    </div>
+                                                    <div>
+                                                      <div className="text-[9px] font-black text-slate-500 uppercase mb-1">Priority</div>
+                                                      <div className="text-xs font-bold truncate text-indigo-300">{priority?.name || "None"}</div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     ))}
                 </div>
             </div>
-        </div>
-      </div>
+          </div>
+        ) : (
+          /* MONTH VIEW */
+          <div className="flex-1 overflow-y-auto grid grid-cols-7 bg-slate-50 p-6 gap-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                  <div key={d} className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">{d}</div>
+              ))}
+              {monthGrid.map(({ date, currentMonth }, i) => {
+                  const dayBlocks = blocks.filter(b => new Date(b.startISO).toDateString() === date.toDateString());
+                  return (
+                      <div 
+                        key={i} 
+                        className={`min-h-[120px] border border-slate-200/50 rounded-[2rem] p-4 flex flex-col gap-1 transition-all ${currentMonth ? 'bg-white hover:border-indigo-100' : 'bg-slate-50/50 opacity-20 grayscale'}`}
+                      >
+                          <div className={`text-[10px] font-black ${new Date().toDateString() === date.toDateString() ? 'text-indigo-600' : 'text-slate-400'}`}>
+                              {date.getDate()}
+                          </div>
+                          <div className="flex-1 overflow-y-auto no-scrollbar space-y-1 mt-2">
+                              {dayBlocks.map(b => (
+                                  <div key={b.id} className="text-[9px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded-lg truncate border border-indigo-100/50">
+                                      {commitments.find(c => c.id === b.commitmentId)?.title || "Event"}
+                                  </div>
+                              ))}
+                          </div>
+                      </div>
+                  );
+              })}
+          </div>
+        )}
+      </main>
 
-      {/* Floating Action Button */}
-      <div className="fixed bottom-12 right-12 z-50 animate-in fade-in slide-in-from-bottom-8 duration-500">
-        <button
-          onClick={onFinish}
-          className="flex items-center gap-4 bg-slate-900 hover:bg-black text-white px-8 py-5 rounded-2xl font-bold text-lg shadow-2xl shadow-slate-200 transition-all transform hover:-translate-y-1 hover:scale-105 active:scale-95 group"
-        >
-          <span className="tracking-tight">View Session Summary</span>
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform">
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-            <polyline points="12 5 19 12 12 19"></polyline>
-          </svg>
-        </button>
-      </div>
+      {loading && (
+        <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-[200] flex flex-col items-center justify-center gap-4 animate-in fade-in">
+           <div className="w-12 h-12 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin"></div>
+           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Syncing Intelligence</p>
+        </div>
+      )}
     </div>
   );
 };

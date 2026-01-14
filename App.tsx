@@ -1,291 +1,302 @@
 
 import React, { useState, useEffect } from "react";
+import { HomeScreen } from "./components/HomeScreen";
 import { DumpScreen } from "./components/DumpScreen";
 import { SortScreen } from "./components/SortScreen";
+import { DurationScreen } from "./components/DurationScreen";
 import { PlanScreen } from "./components/PlanScreen";
 import { ReviewScreen } from "./components/ReviewScreen";
 import { OnboardingScreen } from "./components/OnboardingScreen";
-import { RankScreen } from "./components/RankScreen";
+import { ExecutionScreen } from "./components/ExecutionScreen";
 import { StorageService } from "./services/storage";
-import { CaptureItem, Commitment, StrategicPriority, CalendarBlock } from "./types";
+import { CaptureItem, Commitment, StrategicPriority, CalendarBlock, ExecutionSession } from "./types";
+import { v4 as uuidv4 } from 'uuid';
 
-type Screen = "strategy" | "rank" | "dump" | "sort" | "plan" | "summary";
+type Screen = "home" | "strategy" | "dump" | "sort" | "duration" | "plan" | "summary" | "execution";
 
-const AnimatedLogo = ({ size = "large" }: { size?: "small" | "large" }) => {
+const AnimatedLogo = ({ size = "small" }: { size?: "small" | "large" }) => {
   const isLarge = size === "large";
   return (
     <div className={`relative flex items-center justify-center ${isLarge ? 'w-24 h-24' : 'w-10 h-10'} group`}>
-      {/* Outer Ring Animation */}
       <div className={`absolute inset-0 border-2 border-emerald-200 rounded-[2rem] animate-ring-pulse opacity-20`}></div>
       <div className={`absolute inset-0 border border-emerald-100 rounded-[1.8rem] animate-ring-pulse delay-700 opacity-10`}></div>
-      
-      {/* Main Square */}
       <div className={`relative z-10 w-full h-full bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-[1.8rem] flex items-center justify-center text-white font-black shadow-2xl shadow-emerald-200 overflow-hidden transform group-hover:scale-105 transition-transform duration-500`}>
         <div className="relative z-20 animate-in zoom-in-50 duration-700">
-           <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            width={isLarge ? "48" : "20"} 
-            height={isLarge ? "48" : "20"} 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="3.5" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-            className="animate-draw"
-          >
+           <svg xmlns="http://www.w3.org/2000/svg" width={isLarge ? "48" : "20"} height={isLarge ? "48" : "20"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" className="animate-draw">
             <polyline points="20 6 9 17 4 12"></polyline>
           </svg>
         </div>
-        
-        {/* Shine Animation */}
         <div className="absolute inset-0 bg-white/20 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 skew-x-12"></div>
       </div>
     </div>
   );
 };
 
-const IntroModal = ({ onStart }: { onStart: () => void }) => (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-xl animate-in fade-in duration-700">
-    <div className="bg-white max-w-2xl w-full rounded-[3.5rem] shadow-[0_32px_64px_-15px_rgba(0,0,0,0.2)] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-12 duration-1000 border border-white/20">
-      <div className="p-12 relative">
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-emerald-50 rounded-full blur-3xl opacity-60"></div>
-        
-        <div className="relative z-10">
-          <div className="flex justify-center mb-8">
-            <AnimatedLogo size="large" />
-          </div>
-          
-          <div className="text-center mb-10">
-            <span className="inline-block px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-[0.2em] mb-4">
-              Priority Operating System
-            </span>
-            <h2 className="text-4xl font-light text-slate-800 mb-4 tracking-tight leading-tight">
-              Align your time with <br/>your highest intentions.
-            </h2>
-            <p className="text-slate-500 text-lg font-normal max-w-md mx-auto">
-              ExecuteOS: A calm space to transform overwhelming thoughts into a focused, strategic calendar.
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8 mb-12">
-            <div className="flex gap-4 group">
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-emerald-600 shrink-0 border border-slate-100 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider mb-1">Strategic Pillars</h4>
-                <p className="text-[13px] text-slate-500 leading-relaxed">Define the core areas of focus that anchor your seasonal goals.</p>
-              </div>
-            </div>
-            <div className="flex gap-4 group">
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-emerald-600 shrink-0 border border-slate-100 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10l5 5 5-5M7 6l5 5 5-5"/></svg>
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider mb-1">Rank Focus</h4>
-                <p className="text-[13px] text-slate-500 leading-relaxed">Sequence your priorities to guide your best energy and time.</p>
-              </div>
-            </div>
-            <div className="flex gap-4 group">
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-emerald-600 shrink-0 border border-slate-100 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider mb-1">Brain Dump</h4>
-                <p className="text-[13px] text-slate-500 leading-relaxed">Empty your mind without judgment. Capture every thought.</p>
-              </div>
-            </div>
-            <div className="flex gap-4 group">
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-emerald-600 shrink-0 border border-slate-100 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider mb-1">Flow Into Calendar</h4>
-                <p className="text-[13px] text-slate-500 leading-relaxed">Triage noise and drag meaningful tasks directly into your day.</p>
-              </div>
-            </div>
-          </div>
-
-          <button 
-            onClick={onStart}
-            className="w-full bg-slate-900 hover:bg-black text-white py-6 rounded-[2rem] font-bold text-lg transition-all shadow-2xl shadow-slate-200 flex items-center justify-center gap-3 active:scale-95 group"
-          >
-            Start Operating
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
 const App = () => {
-  const [currentScreen, setCurrentScreen] = useState<Screen>("strategy");
-  const [showIntro, setShowIntro] = useState(false);
+  const [currentScreen, setCurrentScreen] = useState<Screen>("home");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   const [priorities, setPriorities] = useState<StrategicPriority[]>([]);
   const [items, setItems] = useState<CaptureItem[]>([]);
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [blocks, setBlocks] = useState<CalendarBlock[]>([]);
+  const [sessions, setSessions] = useState<ExecutionSession[]>([]);
+  const [viewingSession, setViewingSession] = useState<ExecutionSession | null>(null);
 
   useEffect(() => {
-    const storedPriorities = StorageService.getPriorities();
-    setPriorities(storedPriorities);
+    setPriorities(StorageService.getPriorities());
     setItems(StorageService.getCaptureItems());
     setCommitments(StorageService.getCommitments());
     setBlocks(StorageService.getCalendarBlocks());
-    
-    if (storedPriorities.length > 0) {
-      setCurrentScreen("dump");
-    } else {
-      setCurrentScreen("strategy");
-    }
-
-    const introSeen = localStorage.getItem("ps_intro_seen");
-    if (!introSeen) {
-      setShowIntro(true);
-    }
+    setSessions(StorageService.getSessions());
   }, []);
+
+  const handleStartNewSession = () => {
+    StorageService.clearCurrentBuffers();
+    setItems([]);
+    setCommitments([]);
+    setBlocks([]);
+    setCurrentScreen("dump");
+  };
+
+  const handleSaveSession = (alignmentScore: number) => {
+    const newSession: ExecutionSession = {
+      id: uuidv4(),
+      timestampISO: new Date().toISOString(),
+      items,
+      commitments,
+      blocks,
+      alignmentScore
+    };
+    StorageService.saveSession(newSession);
+    setSessions(StorageService.getSessions());
+    setCurrentScreen("home");
+  };
 
   const handlePrioritySetupComplete = (newPriorities: StrategicPriority[]) => {
     setPriorities(newPriorities);
     StorageService.savePriorities(newPriorities);
-    setCurrentScreen("rank");
+    setCurrentScreen("home");
   };
 
-  const handleRankComplete = (rankedPriorities: StrategicPriority[]) => {
-    setPriorities(rankedPriorities);
-    StorageService.savePriorities(rankedPriorities);
-    setCurrentScreen("dump");
+  const handleAddPriorityOnFly = (newPriority: StrategicPriority) => {
+    const updated = [...priorities, newPriority];
+    setPriorities(updated);
+    StorageService.savePriorities(updated);
   };
 
-  const handleDumpNext = (newItems: CaptureItem[]) => {
-    const updated = [...items, ...newItems];
-    setItems(updated);
-    StorageService.saveCaptureItems(updated);
-    setCurrentScreen("sort");
-  };
+  const sessionSteps: Screen[] = ["dump", "sort", "duration", "plan", "summary"];
+  const isSessionWizard = sessionSteps.includes(currentScreen) && !viewingSession;
+  const currentStepIndex = sessionSteps.indexOf(currentScreen);
 
-  const handleUpdateItems = (updatedItems: CaptureItem[]) => {
-    setItems(updatedItems);
-    StorageService.saveCaptureItems(updatedItems);
+  const goToStep = (step: Screen) => {
+    if (viewingSession) return;
+    setCurrentScreen(step);
   };
-
-  const handleUpdateCommitments = (updatedCommitments: Commitment[]) => {
-    setCommitments(updatedCommitments);
-    StorageService.saveCommitments(updatedCommitments);
-  };
-
-  const handleSortFinish = () => {
-    const stored = StorageService.getCommitments();
-    setCommitments(stored);
-    setCurrentScreen("plan");
-  };
-
-  const handlePlanFinish = () => {
-    const storedBlocks = StorageService.getCalendarBlocks();
-    setBlocks(storedBlocks);
-    setCurrentScreen("summary");
-  };
-
-  const navScreens: Screen[] = ["strategy", "rank", "dump", "sort", "plan", "summary"];
 
   const handleBack = () => {
-    const currentIndex = navScreens.indexOf(currentScreen);
-    if (currentIndex > 0) {
-      setCurrentScreen(navScreens[currentIndex - 1]);
+    if (currentStepIndex > 0) {
+      setCurrentScreen(sessionSteps[currentStepIndex - 1]);
+    } else {
+      setCurrentScreen("home");
     }
   };
 
-  const closeIntro = () => {
-    localStorage.setItem("ps_intro_seen", "true");
-    setShowIntro(false);
+  const handleViewHistorical = (s: ExecutionSession) => {
+    setViewingSession(s);
+    setCurrentScreen("summary");
   };
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-slate-50 text-slate-900 font-sans flex flex-col">
-      {showIntro && <IntroModal onStart={closeIntro} />}
-      
+      {/* GLOBAL TOP NAV */}
       <nav className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-50 shrink-0">
-        <div className="flex justify-between items-center max-w-[1400px] mx-auto">
+        <div className="flex justify-between items-center max-w-[1400px] mx-auto relative">
           <div className="flex items-center gap-4">
-              {currentScreen !== "strategy" && (
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition-all"
+              title="Toggle History Sidebar"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+            <div className="flex items-center gap-3 cursor-pointer group" onClick={() => { setViewingSession(null); setCurrentScreen("home"); }}>
+                <AnimatedLogo size="small" />
+                <div className="flex flex-col">
+                  <span className="font-bold text-xl tracking-tight text-slate-800 hidden md:block group-hover:text-emerald-600 transition-colors leading-none">ExecuteOS</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-300 hidden md:block leading-none mt-1">Command Centre</span>
+                </div>
+            </div>
+          </div>
+
+          {/* SESSION PROGRESS BAR - CENTERED */}
+          {isSessionWizard && (
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-6 bg-slate-50/50 px-5 py-2 rounded-2xl border border-slate-100 hidden lg:flex">
                 <button 
                   onClick={handleBack}
-                  className="p-2 hover:bg-slate-50 rounded-full text-slate-400 transition-colors"
-                  title="Back"
+                  className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-slate-400 hover:text-slate-600 transition-all"
+                  title="Go Back"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
                 </button>
-              )}
-              <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setCurrentScreen("dump")}>
-                  <AnimatedLogo size="small" />
-                  <span className="font-bold text-xl tracking-tight text-slate-800 hidden md:block group-hover:text-emerald-600 transition-colors">ExecuteOS</span>
-              </div>
-          </div>
-          
-          <div className="flex gap-1 items-center">
-              {navScreens.map((s, idx) => (
-                  <div key={s} className="flex items-center">
-                      <button 
-                        className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-widest transition-all ${currentScreen === s ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'text-slate-400 hover:text-slate-600'}`}
-                        onClick={() => setCurrentScreen(s)}
-                      >
-                          {s}
-                      </button>
-                      {idx < navScreens.length - 1 && <div className="w-2 h-px bg-slate-100 mx-1"></div>}
-                  </div>
-              ))}
+                <div className="w-px h-4 bg-slate-200"></div>
+                {sessionSteps.map((step, idx) => {
+                  const isActive = currentScreen === step;
+                  const isCompleted = currentStepIndex > idx;
+                  const labels: Record<string, string> = {
+                    dump: "Dump",
+                    sort: "Triage",
+                    duration: "Effort",
+                    plan: "Schedule",
+                    summary: "Review"
+                  };
+                  return (
+                    <button
+                      key={step}
+                      onClick={() => goToStep(step)}
+                      className={`flex items-center gap-2 group transition-all ${isActive ? 'scale-105' : 'opacity-60 hover:opacity-100'}`}
+                    >
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black transition-all ${isActive ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : isCompleted ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                        {isCompleted ? <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> : idx + 1}
+                      </div>
+                      <span className={`text-[10px] font-bold uppercase tracking-widest ${isActive ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
+                        {labels[step]}
+                      </span>
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => { setViewingSession(null); setCurrentScreen("home"); }} 
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${currentScreen === 'home' && !viewingSession ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'text-slate-400 hover:text-slate-800'}`}
+            >
+              Home
+            </button>
+            <div className="w-px h-4 bg-slate-100"></div>
+            <button 
+              onClick={() => { setViewingSession(null); setCurrentScreen("strategy"); }} 
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${currentScreen === 'strategy' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'text-slate-400 hover:text-emerald-600'}`}
+            >
+              Strategy
+            </button>
           </div>
         </div>
       </nav>
 
-      <main className="flex-1 relative overflow-hidden">
-        {currentScreen === "strategy" && (
-          <OnboardingScreen 
-              initialPriorities={priorities} 
-              onComplete={handlePrioritySetupComplete} 
-          />
-        )}
-        {currentScreen === "rank" && (
-          <RankScreen 
-              priorities={priorities} 
-              onComplete={handleRankComplete} 
-          />
-        )}
-        {currentScreen === "dump" && <DumpScreen onNext={handleDumpNext} />}
-        {currentScreen === "sort" && (
-            <SortScreen 
-                items={items} 
-                commitments={commitments}
-                priorities={priorities} 
-                onUpdateItems={handleUpdateItems}
-                onUpdateCommitments={handleUpdateCommitments}
-                onFinish={handleSortFinish} 
-            />
-        )}
-        {currentScreen === "plan" && (
-            <PlanScreen 
-                commitments={commitments} 
+      <div className="flex-1 flex overflow-hidden">
+        {/* COLLAPSIBLE SIDEBAR */}
+        <aside className={`bg-white border-r border-slate-200 transition-all duration-300 ease-in-out flex flex-col overflow-hidden shrink-0 ${isSidebarOpen ? 'w-80' : 'w-0'}`}>
+          <div className="w-80 h-full flex flex-col">
+            <header className="p-6 border-b border-slate-50 shrink-0">
+              <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">History</h2>
+              <div className="text-xl font-light text-slate-800">Past Sessions</div>
+            </header>
+            <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-3 bg-slate-50/30">
+              {sessions.length === 0 ? (
+                <div className="py-20 text-center opacity-30 px-6">
+                  <p className="text-xs font-bold uppercase tracking-widest">No history yet</p>
+                </div>
+              ) : (
+                sessions.map(session => (
+                  <button 
+                    key={session.id}
+                    onClick={() => handleViewHistorical(session)}
+                    className="w-full bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md hover:border-emerald-100 transition-all text-left group"
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                       <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">{new Date(session.timestampISO).toLocaleDateString()}</span>
+                       <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{session.alignmentScore.toFixed(0)}%</span>
+                    </div>
+                    <div className="text-sm font-bold text-slate-700 truncate">{new Date(session.timestampISO).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} Execution</div>
+                    <div className="mt-3 text-[9px] font-black text-slate-300 uppercase tracking-wider">{session.blocks.length} Blocks scheduled</div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </aside>
+
+        {/* MAIN CONTENT */}
+        <main className="flex-1 relative overflow-hidden flex flex-col">
+          <div className="flex-1 relative overflow-hidden">
+            {currentScreen === "home" && (
+              <HomeScreen 
+                sessions={sessions} 
                 priorities={priorities}
-                onFinish={handlePlanFinish} 
-            />
-        )}
-        {currentScreen === "summary" && (
-            <ReviewScreen 
-                items={items}
+                blocks={blocks}
+                onStartNew={handleStartNewSession} 
+                onStartExecution={() => setCurrentScreen("execution")}
+                onOpenStrategy={() => setCurrentScreen("strategy")}
+              />
+            )}
+            {currentScreen === "strategy" && (
+              <OnboardingScreen 
+                  initialPriorities={priorities} 
+                  onComplete={handlePrioritySetupComplete} 
+              />
+            )}
+            {currentScreen === "dump" && (
+              <DumpScreen onNext={(newItems) => {
+                const updated = [...items, ...newItems];
+                setItems(updated);
+                StorageService.saveCaptureItems(updated);
+                setCurrentScreen("sort");
+              }} />
+            )}
+            {currentScreen === "sort" && (
+                <SortScreen 
+                    items={items} 
+                    commitments={commitments}
+                    priorities={priorities} 
+                    onUpdateItems={(i) => {setItems(i); StorageService.saveCaptureItems(i);}}
+                    onUpdateCommitments={(c) => {setCommitments(c); StorageService.saveCommitments(c);}}
+                    onAddPriority={handleAddPriorityOnFly}
+                    onFinish={() => setCurrentScreen("duration")} 
+                />
+            )}
+            {currentScreen === "duration" && (
+                <DurationScreen
+                    commitments={commitments}
+                    priorities={priorities}
+                    onUpdateCommitments={(c) => {setCommitments(c); StorageService.saveCommitments(c);}}
+                    onFinish={() => setCurrentScreen("plan")}
+                />
+            )}
+            {currentScreen === "plan" && (
+                <PlanScreen 
+                    commitments={commitments} 
+                    priorities={priorities}
+                    onFinish={() => {
+                      setBlocks(StorageService.getCalendarBlocks());
+                      setCurrentScreen("summary");
+                    }} 
+                />
+            )}
+            {currentScreen === "summary" && (
+                <ReviewScreen 
+                    items={viewingSession ? viewingSession.items : items}
+                    commitments={viewingSession ? viewingSession.commitments : commitments}
+                    blocks={viewingSession ? viewingSession.blocks : blocks}
+                    priorities={priorities}
+                    isHistorical={!!viewingSession}
+                    onSave={handleSaveSession}
+                    onRestart={() => { setViewingSession(null); setCurrentScreen("home"); }}
+                />
+            )}
+            {currentScreen === "execution" && (
+              <ExecutionScreen 
                 commitments={commitments}
                 blocks={blocks}
                 priorities={priorities}
-                onRestart={() => {
-                    if(confirm("Clear current session? This will reset all local data.")) {
-                        StorageService.clearAll();
-                    }
-                }}
-            />
-        )}
-      </main>
+                onClose={() => setCurrentScreen("home")}
+              />
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { CaptureItem } from "../types";
 import { v4 as uuidv4 } from 'uuid';
@@ -10,7 +11,6 @@ export const DumpScreen: React.FC<Props> = ({ onNext }) => {
   const [tasks, setTasks] = useState<string[]>([""]);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Keep focus on the last added input if it was just created
   useEffect(() => {
     if (tasks.length > 0) {
       const lastInput = inputRefs.current[tasks.length - 1];
@@ -46,7 +46,6 @@ export const DumpScreen: React.FC<Props> = ({ onNext }) => {
     } else if (e.key === "Backspace" && tasks[index] === "" && tasks.length > 1) {
       e.preventDefault();
       handleRemoveTask(index);
-      // Focus the previous input
       setTimeout(() => {
         inputRefs.current[index - 1]?.focus();
       }, 0);
@@ -71,20 +70,19 @@ export const DumpScreen: React.FC<Props> = ({ onNext }) => {
 
   return (
     <div className="flex flex-col h-full max-w-4xl mx-auto p-6 relative overflow-hidden">
-      <header className="mb-6 shrink-0 animate-in fade-in slide-in-from-top-4 duration-700">
+      <header className="mb-6 shrink-0 animate-in fade-in slide-in-from-top-4 duration-700 text-center lg:text-left">
         <h1 className="text-3xl font-light text-slate-800">Brain Dump</h1>
         <p className="text-slate-500 mt-1">
           List out your actions. Press Enter for a new line.
         </p>
       </header>
 
-      <div className="flex-1 bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-500">
+      <div className="flex-1 bg-white rounded-[2.5rem] shadow-xl shadow-slate-100 border border-slate-100 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-500 mb-24">
         <div className="flex-1 overflow-y-auto p-8 space-y-3 no-scrollbar">
           {tasks.map((task, index) => (
             <div key={index} className="group flex items-center gap-3">
               <div className="flex-1 relative">
                 <input
-                  // Fix: Wrapped ref assignment in a block to ensure the ref callback returns void
                   ref={el => { inputRefs.current[index] = el; }}
                   className="w-full py-4 px-6 text-xl text-slate-700 bg-slate-50 border border-transparent rounded-2xl focus:bg-white focus:border-indigo-300 focus:ring-4 focus:ring-indigo-50/50 outline-none transition-all placeholder:text-slate-200"
                   placeholder="What's on your mind?"
@@ -113,7 +111,6 @@ export const DumpScreen: React.FC<Props> = ({ onNext }) => {
         </div>
       </div>
 
-      {/* STANDARD NAVIGATION BUTTON */}
       {hasContent && (
         <div className="fixed bottom-12 right-12 z-40 animate-in fade-in slide-in-from-bottom-8 duration-500">
           <button
