@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from "react";
+import { v4 as uuidv4 } from 'uuid';
 import { HomeScreen } from "./components/HomeScreen";
 import { DumpScreen } from "./components/DumpScreen";
 import { SortScreen } from "./components/SortScreen";
@@ -10,7 +11,6 @@ import { OnboardingScreen } from "./components/OnboardingScreen";
 import { ExecutionScreen } from "./components/ExecutionScreen";
 import { StorageService } from "./services/storage";
 import { CaptureItem, Commitment, StrategicPriority, CalendarBlock, ExecutionSession } from "./types";
-import { v4 as uuidv4 } from 'uuid';
 
 type Screen = "home" | "strategy" | "dump" | "sort" | "duration" | "plan" | "summary" | "execution";
 
@@ -239,17 +239,20 @@ const App = () => {
               />
             )}
             {currentScreen === "dump" && (
-              <DumpScreen onNext={(newItems) => {
-                const updated = [...items, ...newItems];
-                setItems(updated);
-                StorageService.saveCaptureItems(updated);
-                setCurrentScreen("sort");
-              }} />
+              <DumpScreen 
+                priorities={priorities}
+                onNext={(newItems) => {
+                  const updated = [...items, ...newItems];
+                  setItems(updated);
+                  StorageService.saveCaptureItems(updated);
+                  setCurrentScreen("sort");
+                }} 
+              />
             )}
             {currentScreen === "sort" && (
                 <SortScreen 
-                    items={items} 
-                    commitments={commitments}
+                    items={StorageService.getCaptureItems()} 
+                    commitments={StorageService.getCommitments()}
                     priorities={priorities} 
                     onUpdateItems={(i) => {setItems(i); StorageService.saveCaptureItems(i);}}
                     onUpdateCommitments={(c) => {setCommitments(c); StorageService.saveCommitments(c);}}
@@ -259,7 +262,7 @@ const App = () => {
             )}
             {currentScreen === "duration" && (
                 <DurationScreen
-                    commitments={commitments}
+                    commitments={StorageService.getCommitments()}
                     priorities={priorities}
                     onUpdateCommitments={(c) => {setCommitments(c); StorageService.saveCommitments(c);}}
                     onFinish={() => setCurrentScreen("plan")}
@@ -267,7 +270,7 @@ const App = () => {
             )}
             {currentScreen === "plan" && (
                 <PlanScreen 
-                    commitments={commitments} 
+                    commitments={StorageService.getCommitments()} 
                     priorities={priorities}
                     onFinish={() => {
                       setBlocks(StorageService.getCalendarBlocks());
@@ -277,9 +280,9 @@ const App = () => {
             )}
             {currentScreen === "summary" && (
                 <ReviewScreen 
-                    items={viewingSession ? viewingSession.items : items}
-                    commitments={viewingSession ? viewingSession.commitments : commitments}
-                    blocks={viewingSession ? viewingSession.blocks : blocks}
+                    items={viewingSession ? viewingSession.items : StorageService.getCaptureItems()}
+                    commitments={viewingSession ? viewingSession.commitments : StorageService.getCommitments()}
+                    blocks={viewingSession ? viewingSession.blocks : StorageService.getCalendarBlocks()}
                     priorities={priorities}
                     isHistorical={!!viewingSession}
                     onSave={handleSaveSession}
@@ -288,8 +291,8 @@ const App = () => {
             )}
             {currentScreen === "execution" && (
               <ExecutionScreen 
-                commitments={commitments}
-                blocks={blocks}
+                commitments={StorageService.getCommitments()}
+                blocks={StorageService.getCalendarBlocks()}
                 priorities={priorities}
                 onClose={() => setCurrentScreen("home")}
               />

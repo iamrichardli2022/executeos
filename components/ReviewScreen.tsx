@@ -1,7 +1,7 @@
 
 import React, { useMemo } from "react";
-import { CalendarBlock, Commitment, CaptureItem, StrategicPriority } from "../types";
 import { Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Cell as RechartsCell } from "recharts";
+import { CalendarBlock, Commitment, CaptureItem, StrategicPriority } from "../types";
 
 interface Props {
     items: CaptureItem[];

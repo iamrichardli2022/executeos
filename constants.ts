@@ -1,18 +1,6 @@
 
 import { StrategicPriority } from "./types";
 
-// Helper to safely access environment variables in the browser
-const getEnv = (name: string): string => {
-  try {
-    if (typeof process !== 'undefined' && process.env) {
-      return process.env[name] || "";
-    }
-  } catch (e) {
-    // Ignore errors
-  }
-  return "";
-};
-
 export const PRIORITY_SUGGESTIONS: Partial<StrategicPriority>[] = [
   {
     name: "Health",
@@ -51,9 +39,9 @@ export const PRIORITY_SUGGESTIONS: Partial<StrategicPriority>[] = [
   }
 ];
 
-// Fallback to empty string if not provided; Google Services will handle missing IDs gracefully or show relevant errors
-export const GOOGLE_CLIENT_ID = getEnv("GOOGLE_CLIENT_ID");
-export const GOOGLE_API_KEY = getEnv("GOOGLE_API_KEY") || getEnv("API_KEY");
-export const SCOPES = "https://www.googleapis.com/auth/calendar.events";
+// The API key is injected automatically into process.env.API_KEY
+export const GOOGLE_CLIENT_ID = ""; // To be configured for Google Auth/Calendar
+export const GOOGLE_API_KEY = process.env.API_KEY || "";
+export const SCOPES = "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks";
 
 export const APP_ID = "executeos-app";

@@ -19,6 +19,7 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
   const [viewType, setViewType] = useState<ViewType>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [gridInterval, setGridInterval] = useState(30);
+  const [taskLists, setTaskLists] = useState<any[]>([]);
 
   // Dragging state
   const [draggingCommitment, setDraggingCommitment] = useState<Commitment | null>(null);
@@ -44,11 +45,13 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
     try {
       setLoading(true);
       await GoogleService.signIn();
+      const lists = await GoogleService.listTaskLists();
+      setTaskLists(lists);
       setSignedIn(true);
       setLocalMode(false);
     } catch (e) {
       console.error("Sign in failed", e);
-      alert("Google Calendar connection failed. You can continue in Local Mode.");
+      alert("Google connection failed. You can continue in Local Mode.");
       setLocalMode(true);
     } finally {
       setLoading(false);
@@ -65,7 +68,7 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
         if (signedIn && !localMode) {
             const event = await GoogleService.createEvent("primary", {
                 summary: commitment.title,
-                description: `Managed by ExecuteOS`,
+                description: commitment.description || `Managed by ExecuteOS`,
                 start: { dateTime: start.toISOString() },
                 end: { dateTime: end.toISOString() }
             });
@@ -93,6 +96,45 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
         setLoading(false);
         setDraggingCommitment(null);
         setDragOverInfo(null);
+    }
+  };
+
+  const sendToTasks = async (commitment: Commitment) => {
+    if (!signedIn || localMode) {
+      alert("Please sign in to Google to use Tasks.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const defaultListId = taskLists[0]?.id || "@default";
+      await GoogleService.createTask(defaultListId, {
+        title: commitment.title,
+        notes: commitment.description
+      });
+      
+      // Mark as "scheduled" by creating a ghost block or similar
+      // For now, let's treat Tasks as "scheduled elsewhere"
+      const block: CalendarBlock = {
+          id: uuidv4(),
+          commitmentId: commitment.id,
+          googleEventId: "task-id",
+          calendarId: "tasks",
+          startISO: new Date().toISOString(),
+          endISO: new Date().toISOString(),
+          status: "completed",
+          lastSyncedAtISO: new Date().toISOString()
+      };
+      
+      const updatedBlocks = [...blocks, block];
+      setBlocks(updatedBlocks);
+      localStorage.setItem("ps_calendar_blocks", JSON.stringify(updatedBlocks));
+      alert("Sent to Google Tasks!");
+    } catch (e) {
+      console.error(e);
+      alert("Failed to send to Tasks.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -233,6 +275,14 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{p.name}</span>
                   </div>
                 )}
+                <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => sendToTasks(c)}
+                    className="w-full text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100"
+                  >
+                    Send to Google Tasks
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -245,12 +295,12 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
                 className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 py-4 rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-200 transition-all group"
               >
                 <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.49h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.91C16.65 13.98 18 11.5 18 8.6c0-.21-.02-.42-.05-.63z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.91-2.26c-.8.54-1.83.86-3.05.86-2.34 0-4.32-1.58-5.03-3.7H.95v2.3C2.43 15.89 5.5 18 9 18z"/><path fill="#FBBC05" d="M3.97 10.71c-.18-.54-.28-1.12-.28-1.71s.1-1.17.28-1.71V4.99H.95A8.996 8.996 0 0 0 0 9c0 1.45.35 2.82.95 4.01l3.02-2.3z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.89 11.43 0 9 0 5.5 0 2.43 2.11.95 4.99l3.02 2.3c.71-2.12 2.69-3.7 5.03-3.7z"/></svg>
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 group-hover:text-indigo-600">Connect Calendar</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-600 group-hover:text-indigo-600">Connect Google</span>
               </button>
             ) : (
               <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-2xl border border-emerald-100">
                 <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Google Synced</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Google Connected</span>
               </div>
             )}
             

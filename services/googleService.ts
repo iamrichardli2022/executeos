@@ -88,20 +88,9 @@ export const GoogleService = {
     });
   },
 
+  // Calendar Methods
   listCalendars: async () => {
     const response = await window.gapi.client.calendar.calendarList.list();
-    return response.result.items || [];
-  },
-
-  listEvents: async (calendarId: string, timeMin: string, timeMax: string) => {
-    const response = await window.gapi.client.calendar.events.list({
-      calendarId,
-      timeMin,
-      timeMax,
-      showDeleted: false,
-      singleEvents: true,
-      orderBy: "startTime",
-    });
     return response.result.items || [];
   },
 
@@ -121,6 +110,20 @@ export const GoogleService = {
       resource,
     });
     return response.result;
+  },
+
+  // Tasks Methods
+  listTaskLists: async () => {
+    const response = await window.gapi.client.tasks.tasklists.list();
+    return response.result.items || [];
+  },
+
+  createTask: async (taskListId: string, taskDetails: { title: string; notes?: string; due?: string }) => {
+    const response = await window.gapi.client.tasks.tasks.insert({
+      tasklist: taskListId,
+      resource: taskDetails
+    });
+    return response.result;
   }
 };
 
@@ -132,14 +135,17 @@ async function initializeGapiClient() {
       try {
         await window.gapi.client.init({
           apiKey: GOOGLE_API_KEY,
-          discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"],
+          discoveryDocs: [
+            "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest",
+            "https://www.googleapis.com/discovery/v1/apis/tasks/v1/rest"
+          ],
         });
         gapiInited = true;
       } catch (err) {
         throw err;
       }
     } else {
-      console.warn("GOOGLE_API_KEY is missing. Calendar functionality may be limited.");
+      console.warn("GOOGLE_API_KEY is missing. Calendar/Tasks functionality may be limited.");
       gapiInited = true;
     }
   } else {
