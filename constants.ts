@@ -1,4 +1,3 @@
-
 import { StrategicPriority } from "./types";
 
 export const PRIORITY_SUGGESTIONS: Partial<StrategicPriority>[] = [
@@ -39,9 +38,9 @@ export const PRIORITY_SUGGESTIONS: Partial<StrategicPriority>[] = [
   }
 ];
 
-// The API key is injected automatically into process.env.API_KEY
+// Use Vite environment variables for browser compatibility
 export const GOOGLE_CLIENT_ID = ""; // To be configured for Google Auth/Calendar
-export const GOOGLE_API_KEY = process.env.API_KEY || "";
+export const GOOGLE_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 export const SCOPES = "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks";
 
 export const APP_ID = "executeos-app";

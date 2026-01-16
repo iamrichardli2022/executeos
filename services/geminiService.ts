@@ -1,12 +1,26 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { StrategicPriority } from "../types";
 
-// The API key must be obtained exclusively from the environment variable process.env.API_KEY.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+/**
+ * Safely retrieves the Gemini API key from Vite environment variables.
+ * Throws a clear error if the key is missing to prevent silent failures.
+ */
+const getApiKey = (): string => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "CRITICAL ERROR: VITE_GEMINI_API_KEY is not defined. " +
+      "Please ensure it is set in your .env file or environment variables."
+    );
+  }
+  return apiKey;
+};
 
 export const GeminiService = {
   analyzeDump: async (items: string[], priorities: StrategicPriority[]) => {
+    const apiKey = getApiKey();
+    const ai = new GoogleGenAI({ apiKey });
+    
     const priorityList = priorities.map(p => p.name).join(", ");
     const prompt = `
       You are an expert personal productivity assistant. 
@@ -54,12 +68,15 @@ export const GeminiService = {
         }
       });
 
-      // Use response.text directly (not as a method)
       const text = response.text;
       if (!text) return [];
       return JSON.parse(text.trim());
     } catch (e) {
       console.error("Gemini Analysis failed:", e);
+      // Re-throw if it's an API key error so the UI can handle it specifically if needed
+      if (e instanceof Error && e.message.includes("API_KEY")) {
+        throw e;
+      }
       return [];
     }
   }
