@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { StrategicPriority } from "../types";
 import { v4 as uuidv4 } from 'uuid';
@@ -208,7 +207,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
               <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
             </div>
             <h2 className="text-3xl font-light text-slate-800 mb-4">Define your Pillars.</h2>
-            <p className="text-slate-400 mb-12 max-w-sm text-xl leading-relaxed">ExecuteOS needs to know what truly matters before scheduling.</p>
+            <p className="text-slate-400 mb-12 max-w-sm text-xl leading-relaxed">TaskOS needs to know what truly matters before scheduling.</p>
             <button 
               onClick={startAdding}
               className="bg-emerald-600 text-white px-12 py-6 rounded-[2rem] font-bold text-lg hover:bg-emerald-700 transition-all shadow-2xl shadow-emerald-200 flex items-center gap-3 transform hover:-translate-y-1"

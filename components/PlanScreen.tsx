@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from "react";
 import { CalendarBlock, Commitment, StrategicPriority } from "../types";
 import { GoogleService } from "../services/googleService";
@@ -68,7 +67,7 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
         if (signedIn && !localMode) {
             const event = await GoogleService.createEvent("primary", {
                 summary: commitment.title,
-                description: commitment.description || `Managed by ExecuteOS`,
+                description: commitment.description || `Managed by TaskOS`,
                 start: { dateTime: start.toISOString() },
                 end: { dateTime: end.toISOString() }
             });
@@ -446,13 +445,13 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
 
                                     return (
                                         <div 
+                                            style={{ top: `${top}px`, height: `${height}px` }}
                                             key={block.id}
                                             draggable
                                             onDragStart={() => {
                                                 setDraggingBlockId(block.id);
                                                 setDraggingCommitment(null);
                                             }}
-                                            style={{ top: `${top}px`, height: `${height}px` }}
                                             className={`absolute left-1 right-1 border-l-[6px] rounded-xl shadow-md p-3 overflow-visible z-10 cursor-move transition-all flex flex-col group/block bg-white hover:shadow-2xl hover:z-[60] ${isDragging ? 'opacity-20 grayscale border-slate-300' : 'border-indigo-600'}`}
                                         >
                                             <div className="flex justify-between items-start gap-1">

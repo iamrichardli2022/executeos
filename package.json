@@ -1,6 +1,6 @@
 
 {
-  "name": "priority-schedule-executeos",
+  "name": "priority-schedule-taskos",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.12.7",
