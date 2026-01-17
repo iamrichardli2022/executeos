@@ -37,6 +37,7 @@ export const HomeScreen: React.FC<Props> = ({
   
   const activeStep: 1 | 2 | 3 = !isStep1Done ? 1 : !isStep2Done ? 2 : 3;
 
+  // Use the same definition of "Main Pillars" as the Strategy Hub
   const mainPillars = useMemo(() => priorities.filter(p => p.isPinned), [priorities]);
 
   const getStepContainerClasses = (step: 1 | 2 | 3) => {
@@ -229,42 +230,84 @@ const PillarFocusCard: React.FC<{ p: StrategicPriority, commitments: Commitment[
   const completedCount = pillarTasks.filter(t => t.isCompleted).length;
   const totalCount = pillarTasks.length;
   const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+  
+  const activeTasks = pillarTasks.filter(t => !t.isCompleted);
+  const completedTasks = pillarTasks.filter(t => t.isCompleted);
 
   return (
     <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm hover:shadow-lg transition-all flex flex-col group h-full">
       <div className="flex justify-between items-start mb-6 shrink-0">
         <div>
           <h3 className="text-lg font-bold text-slate-800 tracking-tight leading-tight mb-1">{p.name}</h3>
-          <div className="text-[9px] font-black text-slate-300 uppercase tracking-widest">{totalCount} Active Initiatives</div>
+          <div className="text-[9px] font-black text-slate-300 uppercase tracking-widest">{totalCount} Strategic Tasks</div>
         </div>
         <div className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 mb-8 overflow-y-auto no-scrollbar max-h-48">
-        {pillarTasks.length === 0 ? (
-          <div className="py-6 text-center opacity-20 text-[10px] font-black uppercase tracking-widest">No Active Intent</div>
-        ) : (
-          pillarTasks.map(task => (
-            <div key={task.id} className={`flex items-center gap-3 p-3 rounded-2xl border transition-all ${task.isCurrent ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
-               <div className={`w-1.5 h-1.5 rounded-full ${task.isCurrent ? 'bg-white animate-pulse' : task.isCompleted ? 'bg-emerald-400' : 'bg-slate-300'}`}></div>
-               <span className={`text-[11px] font-bold truncate flex-1 ${task.isCompleted ? 'line-through opacity-50' : ''}`}>{task.title}</span>
-            </div>
-          ))
+      <div className="flex-1 space-y-6 mb-8 overflow-y-auto no-scrollbar max-h-[300px]">
+        {/* ACTIVE SECTION */}
+        {activeTasks.length > 0 && (
+          <div className="space-y-3">
+             <h4 className="text-[9px] font-black text-indigo-400 uppercase tracking-widest px-1">Upcoming Intent</h4>
+             <div className="space-y-2">
+                {activeTasks.slice(0, 4).map(task => (
+                  <div key={task.id} className={`flex items-center gap-3 p-3 rounded-2xl border transition-all ${task.isCurrent ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+                     <div className={`w-1.5 h-1.5 rounded-full ${task.isCurrent ? 'bg-white animate-pulse' : 'bg-indigo-300'}`}></div>
+                     <span className="text-[11px] font-bold truncate flex-1">{task.title}</span>
+                     {task.isCurrent && <span className="text-[7px] font-black bg-white/20 px-1 py-0.5 rounded uppercase">Live</span>}
+                  </div>
+                ))}
+                {activeTasks.length > 4 && (
+                   <div className="text-[9px] text-slate-300 font-bold uppercase text-center">+ {activeTasks.length - 4} More Scheduled</div>
+                )}
+             </div>
+          </div>
+        )}
+
+        {/* COMPLETED SECTION */}
+        {completedTasks.length > 0 && (
+          <div className="space-y-3">
+             <h4 className="text-[9px] font-black text-emerald-500 uppercase tracking-widest px-1">Executed Pillar Items</h4>
+             <div className="space-y-2">
+                {completedTasks.slice(0, 3).map(task => (
+                  <div key={task.id} className="flex items-center gap-3 p-3 rounded-2xl bg-emerald-50/50 border border-emerald-100/50 text-emerald-700 opacity-60">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                     <span className="text-[11px] font-bold truncate flex-1 line-through">{task.title}</span>
+                  </div>
+                ))}
+             </div>
+          </div>
+        )}
+
+        {pillarTasks.length === 0 && (
+          <div className="py-10 text-center border-2 border-dashed border-slate-50 rounded-[2rem] opacity-30 flex flex-col items-center">
+             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+             <p className="text-[10px] font-black uppercase tracking-widest">No Active Intent Mapped</p>
+          </div>
         )}
       </div>
 
-      <div className="mt-auto shrink-0">
-        <div className="flex justify-between items-center mb-2">
-           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Execution Progress</span>
-           <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{Math.round(progress)}%</span>
+      <div className="mt-auto shrink-0 pt-6 border-t border-slate-50">
+        <div className="flex justify-between items-center mb-3">
+           <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pillar Status</span>
+              <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${progress === 100 ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                {progress === 100 ? "Aligned" : "In Progress"}
+              </span>
+           </div>
+           <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">{Math.round(progress)}%</span>
         </div>
-        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
           <div 
-            className="h-full bg-indigo-600 rounded-full transition-all duration-1000" 
+            className="h-full bg-indigo-600 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(79,70,229,0.3)]" 
             style={{ width: `${progress}%` }}
           ></div>
+        </div>
+        <div className="mt-4 flex justify-between text-[9px] font-black text-slate-300 uppercase tracking-widest">
+           <span>{completedCount} Done</span>
+           <span>{activeTasks.length} Remaining</span>
         </div>
       </div>
     </div>

@@ -16,6 +16,7 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
   const [viewType, setViewType] = useState<ViewType>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [gridInterval, setGridInterval] = useState(30);
+  const [now, setNow] = useState(new Date());
 
   // Dragging state
   const [draggingCommitment, setDraggingCommitment] = useState<Commitment | null>(null);
@@ -31,6 +32,12 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
   useEffect(() => {
     const storedBlocks = JSON.parse(localStorage.getItem("ps_calendar_blocks") || "[]");
     setBlocks(storedBlocks);
+
+    // Update 'now' every minute for the current time indicator
+    const timer = setInterval(() => {
+      setNow(new Date());
+    }, 60000);
+    return () => clearInterval(timer);
   }, []);
 
   const scheduledIds = useMemo(() => new Set(blocks.map(b => b.commitmentId)), [blocks]);
@@ -293,7 +300,11 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
 
                 {/* DAY GRID COLUMNS */}
                 <div className="flex-1 flex min-w-[1200px] relative">
-                    {(viewType === "day" ? [currentDate] : daysInWeek).map(day => (
+                    {(viewType === "day" ? [currentDate] : daysInWeek).map(day => {
+                        const isToday = day.toDateString() === now.toDateString();
+                        const timeTop = (now.getHours() + now.getMinutes() / 60) * HOUR_HEIGHT;
+
+                        return (
                         <div key={day.toISOString()} className="flex-1 border-r border-slate-100 relative group">
                             
                             {/* GRID LINES & DROP ZONES */}
@@ -321,6 +332,17 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
                                         })}
                                     </React.Fragment>
                                 ))}
+
+                                {/* CURRENT TIME INDICATOR */}
+                                {isToday && (
+                                    <div 
+                                        className="absolute left-0 right-0 z-40 pointer-events-none flex items-center" 
+                                        style={{ top: `${timeTop}px` }}
+                                    >
+                                        <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 shadow-sm"></div>
+                                        <div className="flex-1 h-px bg-red-500/50 shadow-[0_0_8px_rgba(239,68,68,0.4)]"></div>
+                                    </div>
+                                )}
 
                                 {/* DRAG PREVIEW */}
                                 {dragOverInfo && (draggingCommitment || draggingBlockId) && dragOverInfo.date.toDateString() === day.toDateString() && (() => {
@@ -401,7 +423,7 @@ export const PlanScreen: React.FC<Props> = ({ commitments, priorities, onFinish 
                                 })}
                             </div>
                         </div>
-                    ))}
+                    );})}
                 </div>
             </div>
           </div>
