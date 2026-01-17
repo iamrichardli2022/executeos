@@ -255,7 +255,7 @@ const App = () => {
                         className={`flex items-center gap-2 group transition-all ${isActive ? 'scale-105' : 'opacity-40 hover:opacity-100'}`}
                       >
                         <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black transition-all ${isActive ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : isCompleted ? 'bg-emerald-500 text-white' : 'bg-slate-300 text-white'}`}>
-                          {isCompleted ? <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> : idx + 1}
+                          {isCompleted ? <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> : idx + 1}
                         </div>
                         <span className={`text-[9px] font-bold uppercase tracking-widest ${isActive ? 'text-indigo-600' : 'text-slate-500'}`}>
                           {labels[step]}
@@ -334,6 +334,7 @@ const App = () => {
                 sessions={sessions} 
                 priorities={priorities}
                 blocks={blocks}
+                commitments={commitments}
                 isDemoMode={isDemoMode}
                 onStartNew={handleStartNewSession} 
                 onStartExecution={() => setCurrentScreen("execution")}
@@ -342,7 +343,12 @@ const App = () => {
               />
             )}
             {currentScreen === "strategy" && (
-              <OnboardingScreen initialPriorities={priorities} onComplete={handlePrioritySetupComplete} />
+              <OnboardingScreen 
+                initialPriorities={priorities} 
+                commitments={commitments} 
+                blocks={blocks} 
+                onComplete={handlePrioritySetupComplete} 
+              />
             )}
             {currentScreen === "dump" && (
               <DumpScreen 

@@ -1,15 +1,19 @@
 
-import React, { useState, useRef, useEffect } from "react";
-import { StrategicPriority } from "../types";
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import { StrategicPriority, Commitment, CalendarBlock } from "../types";
 import { v4 as uuidv4 } from 'uuid';
 
 interface Props {
   onComplete: (priorities: StrategicPriority[]) => void;
   initialPriorities: StrategicPriority[];
+  commitments?: Commitment[];
+  blocks?: CalendarBlock[];
 }
 
 interface PriorityCardProps {
   p: StrategicPriority;
+  commitments: Commitment[];
+  blocks: CalendarBlock[];
   onEdit: (p: StrategicPriority) => void;
   onRemove: (id: string) => void;
   onTogglePin: (id: string) => void;
@@ -17,7 +21,7 @@ interface PriorityCardProps {
   isMain?: boolean;
 }
 
-export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPriorities }) => {
+export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPriorities, commitments = [], blocks = [] }) => {
   const [priorities, setPriorities] = useState<StrategicPriority[]>(initialPriorities);
   const [isAddingMode, setIsAddingMode] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -127,9 +131,9 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
     <div className="h-full flex flex-col max-w-[1600px] mx-auto px-8 py-8 overflow-hidden relative">
       <header className="shrink-0 flex flex-col md:flex-row justify-between items-center mb-10 gap-6 animate-in fade-in slide-in-from-top-4 duration-700">
         <div className="text-center md:text-left">
-          <h1 className="text-4xl font-black text-slate-900 mb-1 tracking-tight">Strategic Intent</h1>
+          <h1 className="text-4xl font-black text-slate-900 mb-1 tracking-tight">Strategic Dashboard</h1>
           <p className="text-slate-500 max-w-md leading-relaxed text-sm">
-            Drag items from the shelf to your Main Focus to prioritize them.
+            Monitor your pillars and track tasks that align with your core focus.
           </p>
         </div>
         {!isAddingMode && (
@@ -229,7 +233,17 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
                     </div>
                 ) : (
                     mainFocusItems.map(p => (
-                        <PriorityCard key={p.id} p={p} onEdit={startEditing} onRemove={handleRemove} onTogglePin={togglePin} onDragStart={handleDragStart} isMain />
+                        <PriorityCard 
+                          key={p.id} 
+                          p={p} 
+                          commitments={commitments} 
+                          blocks={blocks} 
+                          onEdit={startEditing} 
+                          onRemove={handleRemove} 
+                          onTogglePin={togglePin} 
+                          onDragStart={handleDragStart} 
+                          isMain 
+                        />
                     ))
                 )}
               </div>
@@ -259,7 +273,16 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
                     </div>
                 ) : (
                     pipelineItems.map(p => (
-                        <PriorityCard key={p.id} p={p} onEdit={startEditing} onRemove={handleRemove} onTogglePin={togglePin} onDragStart={handleDragStart} />
+                        <PriorityCard 
+                          key={p.id} 
+                          p={p} 
+                          commitments={commitments} 
+                          blocks={blocks} 
+                          onEdit={startEditing} 
+                          onRemove={handleRemove} 
+                          onTogglePin={togglePin} 
+                          onDragStart={handleDragStart} 
+                        />
                     ))
                 )}
               </div>
@@ -283,33 +306,94 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
   );
 };
 
-const PriorityCard: React.FC<PriorityCardProps> = ({ p, onEdit, onRemove, onTogglePin, onDragStart, isMain }) => (
-  <div 
-    draggable
-    onDragStart={(e) => onDragStart(e, p.id)}
-    className={`flex flex-col rounded-[2.5rem] border-2 transition-all group overflow-hidden bg-white shadow-xl hover:shadow-2xl cursor-grab active:cursor-grabbing shrink-0 animate-in fade-in zoom-in-95 ${isMain ? 'border-indigo-100 p-8 min-h-[180px]' : 'border-slate-100 p-6 opacity-70 hover:opacity-100 scale-95 hover:scale-100'}`}
-  >
-    <div className="flex-1">
-      <div className="flex items-start justify-between mb-4">
-        <h3 className={`font-black tracking-tight leading-tight ${isMain ? 'text-2xl text-slate-800' : 'text-lg text-slate-600'}`}>{p.name}</h3>
-        <button 
-            onClick={() => onTogglePin(p.id)} 
-            className={`p-2 rounded-xl transition-all ${p.isPinned ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100' : 'text-slate-300 bg-slate-50 hover:text-indigo-400'}`}
-            title={p.isPinned ? "Move to shelf" : "Move to focus"}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width={isMain ? "20" : "16"} height={isMain ? "20" : "16"} viewBox="0 0 24 24" fill={p.isPinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-          </svg>
+const PriorityCard: React.FC<PriorityCardProps> = ({ p, commitments, blocks, onEdit, onRemove, onTogglePin, onDragStart, isMain }) => {
+  const pillarTasks = useMemo(() => {
+    const relevantCommitments = commitments.filter(c => c.priorityId === p.id);
+    const now = new Date();
+    
+    return relevantCommitments.map(c => {
+      const block = blocks.find(b => b.commitmentId === c.id);
+      const isCompleted = block?.status === 'completed' || (block?.endISO && new Date(block.endISO) < now);
+      const isCurrent = block?.startISO && block?.endISO && now >= new Date(block.startISO) && now <= new Date(block.endISO);
+      
+      return { ...c, isCompleted, isCurrent };
+    });
+  }, [p.id, commitments, blocks]);
+
+  const completedTasks = pillarTasks.filter(t => t.isCompleted);
+  const currentAndUpcoming = pillarTasks.filter(t => !t.isCompleted);
+
+  return (
+    <div 
+      draggable
+      onDragStart={(e) => onDragStart(e, p.id)}
+      className={`flex flex-col rounded-[2.5rem] border-2 transition-all group overflow-hidden bg-white shadow-xl hover:shadow-2xl cursor-grab active:cursor-grabbing shrink-0 animate-in fade-in zoom-in-95 ${isMain ? 'border-indigo-100 p-8' : 'border-slate-100 p-6 opacity-70 hover:opacity-100 scale-95 hover:scale-100'}`}
+    >
+      <div className="flex-1">
+        <div className="flex items-start justify-between mb-4">
+          <h3 className={`font-black tracking-tight leading-tight ${isMain ? 'text-2xl text-slate-800' : 'text-lg text-slate-600'}`}>{p.name}</h3>
+          <button 
+              onClick={(e) => { e.stopPropagation(); onTogglePin(p.id); }} 
+              className={`p-2 rounded-xl transition-all ${p.isPinned ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100' : 'text-slate-300 bg-slate-50 hover:text-indigo-400'}`}
+              title={p.isPinned ? "Move to shelf" : "Move to focus"}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width={isMain ? "20" : "16"} height={isMain ? "20" : "16"} viewBox="0 0 24 24" fill={p.isPinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+          </button>
+        </div>
+        <p className={`${isMain ? 'text-sm mb-6' : 'text-xs'} text-slate-500 leading-relaxed line-clamp-2 font-medium italic`}>{p.description}</p>
+
+        {/* TASK VISUALIZATION (Main focus only) */}
+        {isMain && (
+          <div className="mt-4 space-y-4">
+            {currentAndUpcoming.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Active & Upcoming</div>
+                <div className="space-y-2">
+                  {currentAndUpcoming.slice(0, 3).map(task => (
+                    <div key={task.id} className={`flex items-center gap-3 p-3 rounded-2xl border transition-all ${task.isCurrent ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 border-slate-100 text-slate-700'}`}>
+                      <div className={`w-2 h-2 rounded-full ${task.isCurrent ? 'bg-white animate-pulse' : 'bg-indigo-300'}`}></div>
+                      <span className="text-xs font-bold truncate flex-1">{task.title}</span>
+                      {task.isCurrent && <span className="text-[8px] font-black uppercase bg-white/20 px-1.5 py-0.5 rounded-full">LIVE</span>}
+                    </div>
+                  ))}
+                  {currentAndUpcoming.length > 3 && (
+                    <div className="text-[9px] text-slate-300 font-black uppercase text-center">+ {currentAndUpcoming.length - 3} More Scheduled</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {completedTasks.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Completed Intent</div>
+                <div className="space-y-2">
+                  {completedTasks.slice(0, 2).map(task => (
+                    <div key={task.id} className="flex items-center gap-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-700 opacity-60">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      <span className="text-xs font-bold truncate flex-1 line-through">{task.title}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {pillarTasks.length === 0 && (
+              <div className="py-8 text-center border-2 border-dashed border-slate-100 rounded-3xl opacity-30">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No tasks mapped yet</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      
+      <div className={`flex gap-2 ${isMain ? 'mt-8' : 'mt-4'} opacity-0 group-hover:opacity-100 transition-opacity`}>
+        <button onClick={(e) => { e.stopPropagation(); onEdit(p); }} className="flex-1 bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-100">Modify</button>
+        <button onClick={(e) => { e.stopPropagation(); onRemove(p.id); }} className="p-3 bg-slate-50 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-xl transition-all border border-slate-100">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
         </button>
       </div>
-      <p className={`${isMain ? 'text-sm' : 'text-xs'} text-slate-500 leading-relaxed line-clamp-3 font-medium`}>{p.description}</p>
     </div>
-    
-    <div className={`flex gap-2 ${isMain ? 'mt-8' : 'mt-4'} opacity-0 group-hover:opacity-100 transition-opacity`}>
-      <button onClick={() => onEdit(p)} className="flex-1 bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-100">Modify</button>
-      <button onClick={() => onRemove(p.id)} className="p-3 bg-slate-50 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-xl transition-all border border-slate-100">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-      </button>
-    </div>
-  </div>
-);
+  );
+};
