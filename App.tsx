@@ -9,10 +9,12 @@ import { PlanScreen } from "./components/PlanScreen";
 import { ReviewScreen } from "./components/ReviewScreen";
 import { OnboardingScreen } from "./components/OnboardingScreen";
 import { ExecutionScreen } from "./components/ExecutionScreen";
+import { DemoGuide } from "./components/DemoGuide";
 import { StorageService } from "./services/storage";
+import { MOCK_PRIORITIES, MOCK_INBOX_ITEMS, getMockSession, getDemoExecutionData } from "./services/demoData";
 import { CaptureItem, Commitment, StrategicPriority, CalendarBlock, ExecutionSession } from "./types";
 
-type Screen = "home" | "strategy" | "dump" | "sort" | "duration" | "plan" | "summary" | "execution";
+export type Screen = "home" | "strategy" | "dump" | "sort" | "duration" | "plan" | "summary" | "execution";
 
 const AnimatedLogo = ({ size = "small" }: { size?: "small" | "large" }) => {
   const isLarge = size === "large";
@@ -34,7 +36,6 @@ const AnimatedLogo = ({ size = "small" }: { size?: "small" | "large" }) => {
             strokeLinejoin="round" 
             className="transition-transform group-hover:rotate-6"
           >
-            {/* Styled Checkmark Circle */}
             <circle cx="12" cy="12" r="9" className="opacity-20"></circle>
             <polyline points="8 12 11 15 16 9" className="animate-draw" style={{ strokeDasharray: 50, strokeDashoffset: 50 }}></polyline>
           </svg>
@@ -48,6 +49,7 @@ const AnimatedLogo = ({ size = "small" }: { size?: "small" | "large" }) => {
 const App = () => {
   const [currentScreen, setCurrentScreen] = useState<Screen>("home");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   
   const [priorities, setPriorities] = useState<StrategicPriority[]>([]);
   const [items, setItems] = useState<CaptureItem[]>([]);
@@ -57,22 +59,53 @@ const App = () => {
   const [viewingSession, setViewingSession] = useState<ExecutionSession | null>(null);
 
   useEffect(() => {
+    if (!isDemoMode) {
+      setPriorities(StorageService.getPriorities());
+      setItems(StorageService.getCaptureItems());
+      setCommitments(StorageService.getCommitments());
+      setBlocks(StorageService.getCalendarBlocks());
+      setSessions(StorageService.getSessions());
+    }
+  }, [isDemoMode]);
+
+  const handleStartDemo = () => {
+    setIsDemoMode(true);
+    setPriorities(MOCK_PRIORITIES);
+    setItems([]);
+    
+    // Populate with demo execution data so Execution Mode isn't empty
+    const demoData = getDemoExecutionData();
+    setCommitments(demoData.commitments);
+    setBlocks(demoData.blocks);
+    
+    setSessions([getMockSession()]);
+    setCurrentScreen("home");
+  };
+
+  const handleExitDemo = () => {
+    setIsDemoMode(false);
+    // Refresh states from storage when exiting demo
     setPriorities(StorageService.getPriorities());
     setItems(StorageService.getCaptureItems());
     setCommitments(StorageService.getCommitments());
     setBlocks(StorageService.getCalendarBlocks());
     setSessions(StorageService.getSessions());
-  }, []);
+    setCurrentScreen("home");
+  };
 
   const handleStartNewSession = () => {
-    StorageService.clearCurrentBuffers();
-    setItems([]);
+    if (!isDemoMode) StorageService.clearCurrentBuffers();
+    setItems(isDemoMode ? MOCK_INBOX_ITEMS : []);
     setCommitments([]);
     setBlocks([]);
     setCurrentScreen("dump");
   };
 
   const handleSaveSession = (alignmentScore: number) => {
+    if (isDemoMode) {
+      setCurrentScreen("home");
+      return;
+    }
     const newSession: ExecutionSession = {
       id: uuidv4(),
       timestampISO: new Date().toISOString(),
@@ -86,16 +119,28 @@ const App = () => {
     setCurrentScreen("home");
   };
 
+  const handleUpdateHistoricalSession = (updatedSession: ExecutionSession) => {
+    if (isDemoMode) {
+      setViewingSession(updatedSession);
+      return;
+    }
+    const allSessions = StorageService.getSessions();
+    const updatedSessions = allSessions.map(s => s.id === updatedSession.id ? updatedSession : s);
+    localStorage.setItem("ps_sessions", JSON.stringify(updatedSessions));
+    setSessions(updatedSessions);
+    setViewingSession(updatedSession);
+  };
+
   const handlePrioritySetupComplete = (newPriorities: StrategicPriority[]) => {
     setPriorities(newPriorities);
-    StorageService.savePriorities(newPriorities);
+    if (!isDemoMode) StorageService.savePriorities(newPriorities);
     setCurrentScreen("home");
   };
 
   const handleAddPriorityOnFly = (newPriority: StrategicPriority) => {
     const updated = [...priorities, newPriority];
     setPriorities(updated);
-    StorageService.savePriorities(updated);
+    if (!isDemoMode) StorageService.savePriorities(updated);
   };
 
   const sessionSteps: Screen[] = ["dump", "sort", "duration", "plan", "summary"];
@@ -123,10 +168,17 @@ const App = () => {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#FDFDFF] text-slate-900 font-sans flex flex-col">
-      {/* GLOBAL NAV - Flush to corners */}
+      {isDemoMode && (
+        <DemoGuide 
+          currentScreen={currentScreen} 
+          onExit={handleExitDemo} 
+          onNavigate={(screen) => setCurrentScreen(screen)}
+          onStartPlanning={handleStartNewSession}
+        />
+      )}
+      
       <nav className="bg-white/70 backdrop-blur-xl border-b border-slate-100/50 px-6 py-3.5 sticky top-0 z-50 shrink-0">
         <div className="flex justify-between items-center w-full relative">
-          {/* TOP LEFT GROUP: Hamburger + Logo */}
           <div className="flex items-center gap-5">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -148,9 +200,8 @@ const App = () => {
             </div>
           </div>
 
-          {/* CENTER GROUP: SESSION PROGRESS */}
           {isSessionWizard && (
-            <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-2xl hidden lg:flex">
+            <div id="tour-wizard" className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-2xl hidden lg:flex">
                 <button 
                   onClick={handleBack}
                   className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 transition-all"
@@ -166,6 +217,7 @@ const App = () => {
                     return (
                       <button
                         key={step}
+                        id={`tour-nav-${step}`}
                         onClick={() => goToStep(step)}
                         className={`flex items-center gap-2 group transition-all ${isActive ? 'scale-105' : 'opacity-40 hover:opacity-100'}`}
                       >
@@ -182,8 +234,15 @@ const App = () => {
             </div>
           )}
 
-          {/* TOP RIGHT GROUP: NAV LINKS */}
           <div className="flex items-center gap-2">
+            {isDemoMode && (
+              <button 
+                onClick={handleExitDemo}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest mr-4 shadow-lg shadow-indigo-200 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+              >
+                Exit Demo
+              </button>
+            )}
             <button 
               onClick={() => { setViewingSession(null); setCurrentScreen("home"); }} 
               className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all ${currentScreen === 'home' && !viewingSession ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-800'}`}
@@ -191,6 +250,7 @@ const App = () => {
               Home
             </button>
             <button 
+              id="tour-nav-strategy"
               onClick={() => { setViewingSession(null); setCurrentScreen("strategy"); }} 
               className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all ${currentScreen === 'strategy' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-indigo-600'}`}
             >
@@ -201,7 +261,6 @@ const App = () => {
       </nav>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* SIDEBAR */}
         <aside className={`bg-white border-r border-slate-100/50 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] flex flex-col overflow-hidden shrink-0 ${isSidebarOpen ? 'w-80 shadow-2xl' : 'w-0'}`}>
           <div className="w-80 h-full flex flex-col">
             <header className="p-7 border-b border-slate-50 shrink-0">
@@ -218,7 +277,7 @@ const App = () => {
                   <button 
                     key={session.id}
                     onClick={() => handleViewHistorical(session)}
-                    className="w-full bg-white p-5 rounded-[2rem] border border-slate-100/50 shadow-sm hover:shadow-lg hover:border-indigo-200 transition-all duration-300 text-left group"
+                    className={`w-full p-5 rounded-[2rem] border transition-all duration-300 text-left group ${viewingSession?.id === session.id ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100 shadow-sm hover:shadow-lg hover:border-indigo-200'}`}
                   >
                     <div className="flex justify-between items-center mb-3">
                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">{new Date(session.timestampISO).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
@@ -235,7 +294,6 @@ const App = () => {
           </div>
         </aside>
 
-        {/* MAIN AREA */}
         <main className="flex-1 relative overflow-hidden flex flex-col">
           <div className="flex-1 relative overflow-hidden">
             {currentScreen === "home" && (
@@ -243,9 +301,11 @@ const App = () => {
                 sessions={sessions} 
                 priorities={priorities}
                 blocks={blocks}
+                isDemoMode={isDemoMode}
                 onStartNew={handleStartNewSession} 
                 onStartExecution={() => setCurrentScreen("execution")}
                 onOpenStrategy={() => setCurrentScreen("strategy")}
+                onStartDemo={handleStartDemo}
               />
             )}
             {currentScreen === "strategy" && (
@@ -257,55 +317,56 @@ const App = () => {
                 onNext={(newItems) => {
                   const updated = [...items, ...newItems];
                   setItems(updated);
-                  StorageService.saveCaptureItems(updated);
+                  if (!isDemoMode) StorageService.saveCaptureItems(updated);
                   setCurrentScreen("sort");
                 }} 
               />
             )}
             {currentScreen === "sort" && (
                 <SortScreen 
-                    items={StorageService.getCaptureItems()} 
-                    commitments={StorageService.getCommitments()}
+                    items={items} 
+                    commitments={commitments}
                     priorities={priorities} 
-                    onUpdateItems={(i) => {setItems(i); StorageService.saveCaptureItems(i);}}
-                    onUpdateCommitments={(c) => {setCommitments(c); StorageService.saveCommitments(c);}}
+                    onUpdateItems={(i) => {setItems(i); if(!isDemoMode) StorageService.saveCaptureItems(i);}}
+                    onUpdateCommitments={(c) => {setCommitments(c); if(!isDemoMode) StorageService.saveCommitments(c);}}
                     onAddPriority={handleAddPriorityOnFly}
                     onFinish={() => setCurrentScreen("duration")} 
                 />
             )}
             {currentScreen === "duration" && (
                 <DurationScreen
-                    commitments={StorageService.getCommitments()}
+                    commitments={commitments}
                     priorities={priorities}
-                    onUpdateCommitments={(c) => {setCommitments(c); StorageService.saveCommitments(c);}}
+                    onUpdateCommitments={(c) => {setCommitments(c); if(!isDemoMode) StorageService.saveCommitments(c);}}
                     onFinish={() => setCurrentScreen("plan")}
                 />
             )}
             {currentScreen === "plan" && (
                 <PlanScreen 
-                    commitments={StorageService.getCommitments()} 
+                    commitments={commitments} 
                     priorities={priorities}
                     onFinish={() => {
-                      setBlocks(StorageService.getCalendarBlocks());
+                      if (!isDemoMode) setBlocks(StorageService.getCalendarBlocks());
                       setCurrentScreen("summary");
                     }} 
                 />
             )}
             {currentScreen === "summary" && (
                 <ReviewScreen 
-                    items={viewingSession ? viewingSession.items : StorageService.getCaptureItems()}
-                    commitments={viewingSession ? viewingSession.commitments : StorageService.getCommitments()}
-                    blocks={viewingSession ? viewingSession.blocks : StorageService.getCalendarBlocks()}
+                    items={viewingSession ? viewingSession.items : items}
+                    commitments={viewingSession ? viewingSession.commitments : commitments}
+                    blocks={viewingSession ? viewingSession.blocks : blocks}
                     priorities={priorities}
                     isHistorical={!!viewingSession}
+                    onUpdateHistorical={viewingSession ? (data) => handleUpdateHistoricalSession({...viewingSession, ...data}) : undefined}
                     onSave={handleSaveSession}
                     onRestart={() => { setViewingSession(null); setCurrentScreen("home"); }}
                 />
             )}
             {currentScreen === "execution" && (
               <ExecutionScreen 
-                commitments={StorageService.getCommitments()}
-                blocks={StorageService.getCalendarBlocks()}
+                commitments={commitments}
+                blocks={blocks}
                 priorities={priorities}
                 onClose={() => setCurrentScreen("home")}
               />

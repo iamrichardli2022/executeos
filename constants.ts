@@ -39,11 +39,10 @@ export const PRIORITY_SUGGESTIONS: Partial<StrategicPriority>[] = [
   }
 ];
 
-// Google API configuration for Calendar/Tasks
-export const GOOGLE_CLIENT_ID = ""; // To be configured for Google Auth/Calendar
-export const SCOPES = "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks";
-
-// GOOGLE_API_KEY must be obtained exclusively from process.env.API_KEY per guidelines
-export const GOOGLE_API_KEY = process.env.API_KEY;
-
 export const APP_ID = "taskos-app";
+
+// Adding missing Google API configuration constants
+// These are required by GoogleService.ts for Calendar and Tasks integration
+export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+export const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || "";
+export const SCOPES = "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks";

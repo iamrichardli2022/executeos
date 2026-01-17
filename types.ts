@@ -60,21 +60,9 @@ export interface ExecutionSession {
   alignmentScore: number;
 }
 
-export interface SchedulingOption {
-  startISO: string;
-  endISO: string;
-  why: string;
-}
-
-export interface TriageResult {
-  type: CommitmentType;
-  keep: boolean;
-  discardReason?: string;
-  priorityName: string;
+export interface DemoStep {
+  screen: string;
   title: string;
-  description: string;
-  durationMinutes: number;
-  energy: EnergyLevel;
-  confidence: number;
-  clarifyingQuestion?: string;
+  instruction: string;
+  targetSelector?: string;
 }

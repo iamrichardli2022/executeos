@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { StrategicPriority } from "../types";
 import { v4 as uuidv4 } from 'uuid';
@@ -79,7 +80,6 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
   const savePriority = (stayInMode: boolean = false) => {
     const isFormValid = formData.name.trim().length > 0;
 
-    // If stayInMode is false (Save & Close) and the form is empty, just close.
     if (!stayInMode && !isFormValid) {
       setIsAddingMode(false);
       setFormData({ name: "", description: "" });
@@ -87,7 +87,6 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
       return;
     }
 
-    // If we're trying to add/save but it's invalid, stop.
     if (!isFormValid) return;
 
     if (editingId) {
@@ -126,7 +125,6 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
 
   return (
     <div className="h-full flex flex-col max-w-7xl mx-auto px-8 py-8 overflow-hidden relative">
-      {/* HEADER - FIXED HEIGHT */}
       <header className="shrink-0 flex flex-col md:flex-row justify-between items-center mb-10 gap-6 animate-in fade-in slide-in-from-top-4 duration-700">
         <div className="text-center md:text-left">
           <h1 className="text-3xl font-light text-slate-800 mb-1 tracking-tight">Strategy Hub</h1>
@@ -136,6 +134,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
         </div>
         {!isAddingMode && (
           <button 
+            id="tour-strategy-add"
             onClick={startAdding}
             className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 flex items-center gap-2 group transform hover:-translate-y-1"
           >
@@ -145,7 +144,6 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
         )}
       </header>
 
-      {/* CONTENT AREA - GROWS TO FILL SPACE */}
       <div className="flex-1 min-h-0 relative">
         {isAddingMode ? (
           <div className="h-full flex items-center justify-center animate-in fade-in zoom-in-95 duration-500">
@@ -186,7 +184,6 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
                       className={`flex-1 px-8 py-5 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 group ${formData.name.trim() ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-200 hover:bg-emerald-700' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
                     >
                       Add & Create Another
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:rotate-90 transition-transform"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     </button>
                     <button 
                       type="button"
@@ -194,31 +191,14 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
                       className="flex-1 bg-white border border-emerald-200 text-emerald-600 px-8 py-5 rounded-2xl font-bold text-sm hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 group"
                     >
                       {formData.name.trim() ? "Save & Close" : "Done Adding"}
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                     </button>
                   </div>
                 </div>
               </form>
             </div>
           </div>
-        ) : priorities.length === 0 ? (
-          <div className="h-full border-2 border-dashed border-emerald-100 rounded-[4rem] flex flex-col items-center justify-center text-center bg-white/40 backdrop-blur-md animate-in fade-in duration-700">
-            <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-400 mb-8 border border-emerald-100 shadow-inner">
-              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            </div>
-            <h2 className="text-3xl font-light text-slate-800 mb-4">Define your Pillars.</h2>
-            <p className="text-slate-400 mb-12 max-w-sm text-xl leading-relaxed">TaskOS needs to know what truly matters before scheduling.</p>
-            <button 
-              onClick={startAdding}
-              className="bg-emerald-600 text-white px-12 py-6 rounded-[2rem] font-bold text-lg hover:bg-emerald-700 transition-all shadow-2xl shadow-emerald-200 flex items-center gap-3 transform hover:-translate-y-1"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              Add My First Pillar
-            </button>
-          </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* MAIN FOCUS CONTAINER */}
+          <div id="tour-strategy-list" className="grid grid-cols-1 lg:grid-cols-2 gap-10 h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
             <section 
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(true)}
@@ -239,15 +219,9 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
                 {mainFocusItems.map(p => (
                   <PriorityCard key={p.id} p={p} onEdit={startEditing} onRemove={handleRemove} onTogglePin={togglePin} onDragStart={handleDragStart} isMain />
                 ))}
-                {mainFocusItems.length === 0 && (
-                  <div className="h-full border-2 border-dashed border-slate-50 rounded-3xl flex flex-col items-center justify-center text-center opacity-40 py-20">
-                    <p className="text-sm font-medium italic text-slate-400">Focus zone empty.</p>
-                  </div>
-                )}
               </div>
             </section>
 
-            {/* BACKLOG / PIPELINE CONTAINER */}
             <section 
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(false)}
@@ -268,18 +242,12 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
                 {pipelineItems.map(p => (
                   <PriorityCard key={p.id} p={p} onEdit={startEditing} onRemove={handleRemove} onTogglePin={togglePin} onDragStart={handleDragStart} />
                 ))}
-                {pipelineItems.length === 0 && (
-                  <div className="h-full border-2 border-dashed border-slate-200/50 rounded-3xl flex flex-col items-center justify-center text-center opacity-30 py-20">
-                    <p className="text-sm font-medium italic text-slate-400">Pipeline empty.</p>
-                  </div>
-                )}
               </div>
             </section>
           </div>
         )}
       </div>
 
-      {/* FOOTER ACTION - ONLY SHOWS ON MAIN HUB VIEW */}
       {!isAddingMode && isReady && (
         <div className="shrink-0 flex justify-end mt-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <button
@@ -287,10 +255,6 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete, initialPrioritie
             className="flex items-center gap-4 bg-slate-900 hover:bg-black text-white px-10 py-5 rounded-[2rem] font-bold text-lg shadow-2xl shadow-slate-200 transition-all transform hover:-translate-y-1 group"
           >
             Confirm Strategy & Continue
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform">
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-              <polyline points="12 5 19 12 12 19"></polyline>
-            </svg>
           </button>
         </div>
       )}
@@ -307,29 +271,15 @@ const PriorityCard: React.FC<PriorityCardProps> = ({ p, onEdit, onRemove, onTogg
     <div className="p-6">
       <div className="flex items-start justify-between mb-2">
         <h3 className={`text-lg font-bold leading-tight ${isMain ? 'text-slate-800' : 'text-slate-600'}`}>{p.name}</h3>
-        <button 
-          onClick={() => onTogglePin(p.id)}
-          className={`p-2 rounded-xl transition-all ${p.isPinned ? 'text-emerald-500 bg-emerald-50' : 'text-slate-300 bg-slate-50 hover:text-emerald-400'}`}
-        >
+        <button onClick={() => onTogglePin(p.id)} className={`p-2 rounded-xl transition-all ${p.isPinned ? 'text-emerald-500 bg-emerald-50' : 'text-slate-300 bg-slate-50 hover:text-emerald-400'}`}>
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={p.isPinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
         </button>
       </div>
-      <p className="text-xs text-slate-500 leading-relaxed line-clamp-2 italic">
-        {p.description}
-      </p>
+      <p className="text-xs text-slate-500 leading-relaxed line-clamp-2 italic">{p.description}</p>
     </div>
     <div className="px-6 pb-6 flex gap-2">
-      <button 
-        onClick={() => onEdit(p)}
-        className="flex-1 bg-slate-50 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 border border-slate-100"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-        Edit
-      </button>
-      <button 
-        onClick={() => onRemove(p.id)}
-        className="p-3 bg-slate-50 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-xl transition-all border border-slate-100"
-      >
+      <button onClick={() => onEdit(p)} className="flex-1 bg-slate-50 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 border border-slate-100">Edit</button>
+      <button onClick={() => onRemove(p.id)} className="p-3 bg-slate-50 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-xl transition-all border border-slate-100">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
       </button>
     </div>
