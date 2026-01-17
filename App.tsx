@@ -10,6 +10,7 @@ import { ReviewScreen } from "./components/ReviewScreen";
 import { OnboardingScreen } from "./components/OnboardingScreen";
 import { ExecutionScreen } from "./components/ExecutionScreen";
 import { DemoGuide } from "./components/DemoGuide";
+import { MobileApp } from "./components/mobile/MobileApp";
 import { StorageService } from "./services/storage";
 import { MOCK_PRIORITIES, MOCK_INBOX_ITEMS, getMockSession, getDemoExecutionData } from "./services/demoData";
 import { CaptureItem, Commitment, StrategicPriority, CalendarBlock, ExecutionSession } from "./types";
@@ -47,6 +48,7 @@ const AnimatedLogo = ({ size = "small" }: { size?: "small" | "large" }) => {
 };
 
 const App = () => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [currentScreen, setCurrentScreen] = useState<Screen>("home");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -57,6 +59,13 @@ const App = () => {
   const [blocks, setBlocks] = useState<CalendarBlock[]>([]);
   const [sessions, setSessions] = useState<ExecutionSession[]>([]);
   const [viewingSession, setViewingSession] = useState<ExecutionSession | null>(null);
+
+  // Re-check mobile status on resize
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (!isDemoMode) {
@@ -72,19 +81,15 @@ const App = () => {
     setIsDemoMode(true);
     setPriorities(MOCK_PRIORITIES);
     setItems([]);
-    
-    // Populate with demo execution data so Execution Mode isn't empty
     const demoData = getDemoExecutionData();
     setCommitments(demoData.commitments);
     setBlocks(demoData.blocks);
-    
     setSessions([getMockSession()]);
     setCurrentScreen("home");
   };
 
   const handleExitDemo = () => {
     setIsDemoMode(false);
-    // Refresh states from storage when exiting demo
     setPriorities(StorageService.getPriorities());
     setItems(StorageService.getCaptureItems());
     setCommitments(StorageService.getCommitments());
@@ -143,6 +148,40 @@ const App = () => {
     if (!isDemoMode) StorageService.savePriorities(updated);
   };
 
+  const handleViewHistorical = (s: ExecutionSession) => {
+    setViewingSession(s);
+    setCurrentScreen("summary");
+    if (window.innerWidth < 1024) setIsSidebarOpen(false);
+  };
+
+  // If on mobile, return the dedicated Mobile App
+  if (isMobile) {
+    return (
+      <MobileApp 
+        currentScreen={currentScreen}
+        setCurrentScreen={setCurrentScreen}
+        isDemoMode={isDemoMode}
+        priorities={priorities}
+        items={items}
+        setItems={(i) => {setItems(i); if(!isDemoMode) StorageService.saveCaptureItems(i);}}
+        commitments={commitments}
+        setCommitments={(c) => {setCommitments(c); if(!isDemoMode) StorageService.saveCommitments(c);}}
+        blocks={blocks}
+        sessions={sessions}
+        viewingSession={viewingSession}
+        setViewingSession={setViewingSession}
+        onStartDemo={handleStartDemo}
+        onExitDemo={handleExitDemo}
+        onStartNew={handleStartNewSession}
+        onSaveSession={handleSaveSession}
+        onUpdateHistorical={handleUpdateHistoricalSession}
+        onPriorityComplete={handlePrioritySetupComplete}
+        onAddPriority={handleAddPriorityOnFly}
+      />
+    );
+  }
+
+  // Original Desktop Experience
   const sessionSteps: Screen[] = ["dump", "sort", "duration", "plan", "summary"];
   const isSessionWizard = sessionSteps.includes(currentScreen) && !viewingSession;
   const currentStepIndex = sessionSteps.indexOf(currentScreen);
@@ -158,12 +197,6 @@ const App = () => {
     } else {
       setCurrentScreen("home");
     }
-  };
-
-  const handleViewHistorical = (s: ExecutionSession) => {
-    setViewingSession(s);
-    setCurrentScreen("summary");
-    if (window.innerWidth < 1024) setIsSidebarOpen(false);
   };
 
   return (
@@ -222,7 +255,7 @@ const App = () => {
                         className={`flex items-center gap-2 group transition-all ${isActive ? 'scale-105' : 'opacity-40 hover:opacity-100'}`}
                       >
                         <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black transition-all ${isActive ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : isCompleted ? 'bg-emerald-500 text-white' : 'bg-slate-300 text-white'}`}>
-                          {isCompleted ? <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> : idx + 1}
+                          {isCompleted ? <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> : idx + 1}
                         </div>
                         <span className={`text-[9px] font-bold uppercase tracking-widest ${isActive ? 'text-indigo-600' : 'text-slate-500'}`}>
                           {labels[step]}
